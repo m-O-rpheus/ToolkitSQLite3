@@ -22,10 +22,10 @@ class ToolkitSQLite3 {
 
 	public function __construct( string $fileName, string $tableName ) {
 
-		$this->sqlite = new SQLite3( $fileName );
-		$this->tblnam = self::sanitize_sqlite_name( $tableName );
+		self::error_if_invalid_sqlite_name( $tableName );
 
-		self::ERROR_ON_EMPTY_NAME( $this->tblnam );
+		$this->sqlite = new SQLite3( $fileName );
+		$this->tblnam = $tableName;
 	}
 
 
@@ -35,63 +35,43 @@ class ToolkitSQLite3 {
 	// Error Handlers.
 	// -----------------------------------------------------------------------------------------------------------------------------
 
-	private static function ERROR_ON_EMPTY_NAME( string $name ) : void {
+	private static function error_if_invalid_sqlite_name( string $name ) : void {
 
-		if( empty( $name ) ) {
+		if( preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
 
-			trigger_error( 'ERROR: Name is invalid or empty. It must contain only letters, numbers, or underscores.', E_USER_ERROR );
+			trigger_error( 'ERROR: The table or column name in SQLite3 is invalid. It may contain only letters, numbers, or underscores.', E_USER_ERROR );
 			exit();
 		}
 	}
 
 
-	private static function ERROR_ON_COMPARISON_FAIL( array $arr1, array $arr2 ) : void {
+	private static function error_if_invalid_sqlite_type( string $type ) : void {
 
-		if( $arr1 !== $arr2 ) {
+		if( !in_array( $type, ['INTEGER', 'REAL', 'BLOB', 'TEXT'], true ) ) {
 
-			trigger_error( 'ERROR: SQL operation could not be executed correctly. The expected and actual data do not match.', E_USER_ERROR );
+			trigger_error( 'ERROR: The SQLite3 column type is invalid. Allowed types are: INTEGER, REAL, BLOB, TEXT.', E_USER_ERROR );
 			exit();
 		}
 	}
 
 
-	private static function ERROR_ON_PARAM_ARRAY_MISMATCH( array $arr1, array $arr2 ) : void {
+	private static function error_if_empty_sqlite_slug( string $slug ) : void {
 
-		if( count( $arr1 ) !== count( $arr2 ) ) {
-
-			trigger_error( 'ERROR: Invalid parameter array. It contains invalid or empty columns into which values could not be written.', E_USER_ERROR );
+		if( strlen( $slug ) === 0 ) {
+			
+			trigger_error( 'ERROR: The row slug in SQLite3 must not be empty.', E_USER_ERROR );
 			exit();
 		}
 	}
 
 
+	private static function error_if_sqlite_executions_differ( array $arrbefore, array $arrafter ) : void {
 
+		if( count( $arrbefore ) !== count( $arrafter ) ) {
 
-
-	// Static Sanitize Methods.
-	// -----------------------------------------------------------------------------------------------------------------------------
-
-	// Sanitizes a SQLite table or column name by allowing only letters (a-z, A-Z), digits (0-9), and underscores.
-	// Leading characters that are not letters are removed to ensure valid SQLite identifiers.
-	final public static function sanitize_sqlite_name( string $name ) : string {
-
-		$name = preg_replace( '/[^a-zA-Z0-9_]/', '', $name ); // Remove all invalid characters.
-		$name = preg_replace( '/^[^a-zA-Z]+/', '', $name );   // Remove leading characters that are not letters.
-
-		/** @var string */
-		return $name;
-	}
-
-
-	// Sanitizes a SQLite column type. Valid types are INTEGER, REAL, or BLOB. Any other value defaults to TEXT.
-	// All types are converted to uppercase to maintain consistency.
-	final public static function sanitize_sqlite_type( string $type ) : string {
-
-		$type = strtoupper( preg_replace( '/[^A-Z]/', '', $type ) );                   // Uppercase and remove invalid characters.
-		$type = in_array( $type, ['INTEGER', 'REAL', 'BLOB'], true ) ? $type : 'TEXT'; // Default Type if invalid.
-
-		/** @var string */
-		return $type;
+			trigger_error( 'ERROR: The SQLite3 SQL operation could not be executed correctly. Possible causes: data inconsistency or attempt to select non-existent columns.', E_USER_ERROR );
+			exit();
+		}
 	}
 
 
@@ -178,9 +158,7 @@ class ToolkitSQLite3 {
 	// Checks whether a column exists in the current table by verifying the column name in the table's column information.
 	public function column_exists( string $columnName ) : bool {
 
-		$columnName = self::sanitize_sqlite_name( $columnName );
-
-		self::ERROR_ON_EMPTY_NAME( $columnName );
+		self::error_if_invalid_sqlite_name( $columnName );
 
 		/** @var bool */
 		return array_key_exists( $columnName, $this->table_info_columns() );
@@ -190,10 +168,8 @@ class ToolkitSQLite3 {
 	// Adds a column to the table if it does not exist. Returns 0 on query error, 1 if the column was added, or 2 if the column already exists and was ignored.
 	public function column_add_ignore( string $columnName, string $columnType ) : int {
 
-		$columnName = self::sanitize_sqlite_name( $columnName );
-		$columnType = self::sanitize_sqlite_type( $columnType );
-
-		self::ERROR_ON_EMPTY_NAME( $columnName );
+		self::error_if_invalid_sqlite_name( $columnName );
+		self::error_if_invalid_sqlite_type( $columnType );
 
 		$sql = <<<SQL
 			ALTER TABLE `{$this->tblnam}` ADD COLUMN `{$columnName}` {$columnType};
@@ -207,9 +183,7 @@ class ToolkitSQLite3 {
 	// Removes a column from the table if it exists. Returns 0 on query error, 1 if column was removed, or 2 if the column does not exist and was ignored.
 	public function column_delete_ignore( string $columnName ) : int {
 
-		$columnName = self::sanitize_sqlite_name( $columnName );
-
-		self::ERROR_ON_EMPTY_NAME( $columnName );
+		self::error_if_invalid_sqlite_name( $columnName );
 
 		$sql = <<<SQL
 			ALTER TABLE `{$this->tblnam}` DROP COLUMN `{$columnName}`;
@@ -227,7 +201,7 @@ class ToolkitSQLite3 {
 	// -----------------------------------------------------------------------------------------------------------------------------
 
 	// Creates a table and multiple columns in a single call. Existing tables or columns are ignored. 
-	// Throws an error if any expected columns could not be created. Note: Both newly created and pre-existing tables are processed.
+	// Throws an error if there are problems executing the statement due to SQL issues.
 	public function table_column_add_ignore( array $columnNameTypePair ) : bool {
 
 		$comparison = [];
@@ -243,7 +217,7 @@ class ToolkitSQLite3 {
 			}
 		}
 
-		self::ERROR_ON_COMPARISON_FAIL( $columnNameTypePair, $comparison );
+		self::error_if_sqlite_executions_differ( $columnNameTypePair, $comparison );
 
 		/** @var bool */
 		return true;
@@ -259,7 +233,7 @@ class ToolkitSQLite3 {
 	// Checks if a row exists in the table using its slug value. Returns true if it exists, false otherwise.
 	public function row_isset( string $rowSlug ) : bool {
 
-		self::ERROR_ON_EMPTY_NAME( $rowSlug );
+		self::error_if_empty_sqlite_slug( $rowSlug );
 
 		$sql = <<<SQL
 			SELECT 1 FROM `{$this->tblnam}` WHERE _slug = :slug LIMIT 1;
@@ -287,7 +261,7 @@ class ToolkitSQLite3 {
 	// Returns true if the operation was successful.
 	public function row_upsert( string $rowSlug, array $columnNameValuePair ) : bool {
 
-		self::ERROR_ON_EMPTY_NAME( $rowSlug );
+		self::error_if_empty_sqlite_slug( $rowSlug );
 
 		$fnResult = false;
 
@@ -299,11 +273,9 @@ class ToolkitSQLite3 {
 		// Build the prepare array which contains all custom columnName => columnValue pairs with their corresponding bind values and type mapping.
 		foreach( $columnNameValuePair as $columnName => $columnValue ) {
 
-			$columnName = self::sanitize_sqlite_name( $columnName );
+			// The following statements are equivalent to column_exists, but prevent multiple executions of table_info_columns.
+			self::error_if_invalid_sqlite_name( $columnName );
 
-			self::ERROR_ON_EMPTY_NAME( $columnName );
-
-			// Only include columns that exist in the table; this avoids multiple calls to table_info_columns and is equivalent to column_exists check.
 			if( array_key_exists( $columnName, $tblinfo ) ) {
 
 				$typeMapping = ( $columnValue === null ) ? SQLITE3_NULL : ( $mapping[$tblinfo[$columnName]] ?? SQLITE3_TEXT );
@@ -317,8 +289,7 @@ class ToolkitSQLite3 {
 			}
 		}
 
-
-		self::ERROR_ON_PARAM_ARRAY_MISMATCH( $columnNameValuePair, $prepare );
+		self::error_if_sqlite_executions_differ( $columnNameValuePair, $prepare );
 
 
 		// Define default values for INSERT operations that are always added.
@@ -371,8 +342,7 @@ class ToolkitSQLite3 {
 				}
 			}
 
-			// Verify that all bindings succeeded and match the expected prepare array.
-			self::ERROR_ON_COMPARISON_FAIL( $prepare, $comparison );
+			self::error_if_sqlite_executions_differ( $prepare, $comparison );
 
 			if( ( $result = $stmt->execute() ) !== false ) {
 
@@ -388,7 +358,7 @@ class ToolkitSQLite3 {
 	// Removes a row from the table using its slug if it exists. Returns true if the deletion query executed successfully, false otherwise.
 	public function row_remove( string $rowSlug ) : bool {
 
-		self::ERROR_ON_EMPTY_NAME( $rowSlug );
+		self::error_if_empty_sqlite_slug( $rowSlug );
 
 		$fnResult = false;
 

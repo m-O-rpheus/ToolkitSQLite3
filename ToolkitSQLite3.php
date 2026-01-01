@@ -65,11 +65,11 @@ class ToolkitSQLite3 {
 	}
 
 
-	private static function error_if_sqlite_executions_differ( array $arrbefore, array $arrafter ) : void {
+	private static function error_if_sqlite_parameter_columns_missing( array $arrbefore, array $arrafter ) : void {
 
 		if( count( $arrbefore ) !== count( $arrafter ) ) {
 
-			trigger_error( 'ERROR: The SQLite3 SQL operation could not be executed correctly. Possible causes: data inconsistency or attempt to select non-existent columns.', E_USER_ERROR );
+			trigger_error( 'ERROR: Invalid function parameter array for the SQLite3 operation. Not all specified columns exist in the database table. Please create all required columns first or adjust the function parameter array accordingly.', E_USER_ERROR );
 			exit();
 		}
 	}
@@ -81,7 +81,7 @@ class ToolkitSQLite3 {
 	// Instance Common Methods.
 	// -----------------------------------------------------------------------------------------------------------------------------
 
-	// Retrieves an array of column names and their types for the current table. Returns an empty array if the table does not exist or the query fails.
+	// Retrieves an array of column names and their types for the current table. Returns an empty array if the table does not exist or on query error.
 	public function table_info_columns() : array {
 
 		$sql = <<<SQL
@@ -112,7 +112,7 @@ class ToolkitSQLite3 {
 	// Instance Table Methods.
 	// -----------------------------------------------------------------------------------------------------------------------------
 
-	// Checks if the table exists by verifying whether column information can be retrieved.
+	// Checks if the table exists by verifying whether column information can be retrieved. Returns true if the table exists, false otherwise.
 	public function table_exists() : bool {
 
 		/** @var bool */
@@ -120,7 +120,7 @@ class ToolkitSQLite3 {
 	}
 
 
-	// Creates a table if it does not already exist. Returns 0 on query error, 1 if table was successfully created, or 2 if the table already exists and was ignored.
+	// Creates a table if it does not already exist. Returns 1 if the table was created successfully, 2 if it already exists, or 0 on query error.
 	public function table_add_ignore() : int {
 
 		$sql = <<<SQL
@@ -137,7 +137,7 @@ class ToolkitSQLite3 {
 	}
 
 
-	// Drops the table if it exists. Returns 0 on query error, 1 if table was removed, or 2 if the table did not exist and was ignored.
+	// Drops the table if it exists. Returns 1 if the table was removed successfully, 2 if it did not exist, or 0 on query error.
 	public function table_delete_ignore() : int {
 
 		$sql = <<<SQL
@@ -155,7 +155,7 @@ class ToolkitSQLite3 {
 	// Instance Column Methods.
 	// -----------------------------------------------------------------------------------------------------------------------------
 
-	// Checks whether a column exists in the current table by verifying the column name in the table's column information.
+	// Checks whether a column exists in the current table by verifying the column name in the table's column information. Returns true if the column exists, false otherwise.
 	public function column_exists( string $columnName ) : bool {
 
 		self::error_if_invalid_sqlite_name( $columnName );
@@ -165,7 +165,7 @@ class ToolkitSQLite3 {
 	}
 
 
-	// Adds a column to the table if it does not exist. Returns 0 on query error, 1 if the column was added, or 2 if the column already exists and was ignored.
+	// Adds a column to the table if it does not exist. Returns 1 if the column was added successfully, 2 if it already exists, or 0 on query error.
 	public function column_add_ignore( string $columnName, string $columnType ) : int {
 
 		self::error_if_invalid_sqlite_name( $columnName );
@@ -180,7 +180,7 @@ class ToolkitSQLite3 {
 	}
 
 
-	// Removes a column from the table if it exists. Returns 0 on query error, 1 if column was removed, or 2 if the column does not exist and was ignored.
+	// Removes a column from the table if it exists. Returns 1 if the column was removed successfully, 2 if it did not exist, or 0 on query error.
 	public function column_delete_ignore( string $columnName ) : int {
 
 		self::error_if_invalid_sqlite_name( $columnName );
@@ -200,8 +200,8 @@ class ToolkitSQLite3 {
 	// Instance Combination Methods.
 	// -----------------------------------------------------------------------------------------------------------------------------
 
-	// Creates a table and multiple columns in a single call. Existing tables or columns are ignored. 
-	// Throws an error if there are problems executing the statement due to SQL issues.
+	// Creates a table and multiple columns in a single call. Existing tables or columns are ignored.
+	// Returns true if the query executed successfully (table and all columns created or already existed), or false on query error.
 	public function table_column_add_ignore( array $columnNameTypePair ) : bool {
 
 		$comparison = [];
@@ -217,10 +217,8 @@ class ToolkitSQLite3 {
 			}
 		}
 
-		self::error_if_sqlite_executions_differ( $columnNameTypePair, $comparison );
-
 		/** @var bool */
-		return true;
+		return $columnNameTypePair === $comparison;
 	}
 
 
@@ -230,7 +228,7 @@ class ToolkitSQLite3 {
 	// Instance Row Methods.
 	// -----------------------------------------------------------------------------------------------------------------------------
 
-	// Checks if a row exists in the table using its slug value. Returns true if it exists, false otherwise.
+	// Checks if a row exists in the table using its slug value. Returns true if the row exists, false otherwise.
 	public function row_isset( string $rowSlug ) : bool {
 
 		self::error_if_empty_sqlite_slug( $rowSlug );
@@ -258,12 +256,10 @@ class ToolkitSQLite3 {
 
 
 	// Inserts a new row or updates an existing row based on the slug value. All values are safely bound using prepared statements with correct type mapping.
-	// Returns true if the operation was successful.
+	// Returns true if the query executed successfully (row inserted or updated), or false on query error.
 	public function row_upsert( string $rowSlug, array $columnNameValuePair ) : bool {
 
 		self::error_if_empty_sqlite_slug( $rowSlug );
-
-		$fnResult = false;
 
 		$tblinfo = $this->table_info_columns();
 		$mapping = ['INTEGER' => SQLITE3_INTEGER, 'REAL' => SQLITE3_FLOAT, 'BLOB' => SQLITE3_BLOB];
@@ -289,8 +285,7 @@ class ToolkitSQLite3 {
 			}
 		}
 
-		self::error_if_sqlite_executions_differ( $columnNameValuePair, $prepare );
-
+		self::error_if_sqlite_parameter_columns_missing( $columnNameValuePair, $prepare );
 
 		// Define default values for INSERT operations that are always added.
 		$insertDefaults = [
@@ -306,8 +301,6 @@ class ToolkitSQLite3 {
 		// Extract the custom prepared columns from the prepare array for use in SQL statements.
 		$upsertCustom = array_combine( array_column( $prepare, 'columnName' ), array_keys( $prepare ) );
 
-
-
 		// Merge all INSERT columns and values into one set for the final INSERT statement.
 		$insert_merged = array_merge( $insertDefaults, $upsertDefaults, $upsertCustom );
 		$insert_into   = implode( ',', array_keys( $insert_merged ) );
@@ -319,14 +312,12 @@ class ToolkitSQLite3 {
 
 
 
-		// Build the final SQL statement for the UPSERT operation using ON CONFLICT DO UPDATE.
 		$sql = <<<SQL
 			INSERT INTO `{$this->tblnam}` ({$insert_into}) VALUES ({$insert_values}) ON CONFLICT(_slug) DO UPDATE SET {$do_update_set};
 		SQL;
 
+		$fnResult = false;
 
-
-		// Execute the prepared statement.
 		if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
 
 			$comparison = [];
@@ -342,11 +333,12 @@ class ToolkitSQLite3 {
 				}
 			}
 
-			self::error_if_sqlite_executions_differ( $prepare, $comparison );
+			if( $prepare === $comparison ) {
 
-			if( ( $result = $stmt->execute() ) !== false ) {
+				if( ( $result = $stmt->execute() ) !== false ) {
 
-				$fnResult = true;
+					$fnResult = true;
+				}
 			}
 		}
 
@@ -355,16 +347,16 @@ class ToolkitSQLite3 {
 	}
 
 
-	// Removes a row from the table using its slug if it exists. Returns true if the deletion query executed successfully, false otherwise.
+	// Removes a row from the table using its slug if it exists. Returns true if the query executed successfully, or false on query error.
 	public function row_remove( string $rowSlug ) : bool {
 
 		self::error_if_empty_sqlite_slug( $rowSlug );
 
-		$fnResult = false;
-
 		$sql = <<<SQL
 			DELETE FROM `{$this->tblnam}` WHERE _slug = :slug;
 		SQL;
+
+		$fnResult = false;
 
 		if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
 

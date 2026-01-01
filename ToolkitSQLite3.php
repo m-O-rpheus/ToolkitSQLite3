@@ -1,14 +1,18 @@
 <?php
 
 
-// ToolkitSQLite3
-// Provides a helper class for SQLite3 operations: creating tables, adding/removing columns, and upserting rows.
-// Focuses on simplicity, speed, and SQL injection safety.
-// 
-// Example:
-// $instance = new ToolkitSQLite3( 'database.sqlite3', 'table_name_1' );
-// $instance->table_column_add_ignore( ['meta_column1' => 'TEXT', 'meta_column2' => 'INT', 'meta_column3' => 'BLOB'] );
-// $instance->row_upsert( 'row1', ['meta_column1' => 'value1', 'meta_column2' => '2', 'meta_column3' => 'value3'] );
+/*
+ * ToolkitSQLite3
+ *
+ * This repository is licensed under the MIT License.
+ * 
+ * Any use, copy, modification, or redistribution of this repository
+ * or any substantial portion of it must retain attribution to the
+ * original author and the original GitHub repository.
+ * 
+ * Copyright (c) 2026 Markus Jäger
+ * https://github.com/m-O-rpheus/ToolkitSQLite3
+ */
 
 
 class ToolkitSQLite3 {

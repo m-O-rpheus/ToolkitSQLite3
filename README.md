@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 0.93
+### Version 0.94
 
 ---
 
@@ -14,7 +14,7 @@ It encapsulates common database tasks such as table and column management as wel
 - Strict sanitization of table and column names
 - Prepared statements with correct type mapping
 - Focus on simplicity, performance, and SQL injection safety
-- All "ignore" operations are implemented via schema pre-checks, not via SQL IF EXISTS clauses.
+- All "ignore" operations are implemented via schema pre-checks, not via SQL IF EXISTS clauses
 
 ## Requirements
 - PHP 8.1 or higher
@@ -27,13 +27,13 @@ require 'ToolkitSQLite3.php';
 // Last check 01.01.2026
 ```
 
-## Basic Usage:
+## Basic Usage
 ```php
 $db = new ToolkitSQLite3( 'database.sqlite3', 'example_table' );
 // Last check 01.01.2026
 ```
 
-## Table Handling:
+## Table Handling
 **Check if a table exists**
 ```php
 if ( $db->table_exists() ) {
@@ -62,7 +62,7 @@ $result = $db->table_delete_ignore();
 // Last check 01.01.2026
 ```
 
-## Column Handling:
+## Column Handling
 **Add a column (ignored if it already exists)**
 ```php
 $db->column_add_ignore( 'title', 'TEXT' );
@@ -95,7 +95,9 @@ $db->column_delete_ignore( 'views' );
 // Last check 01.01.2026
 ```
 
-## Row Handling (Each row is uniquely identified by a _slug value)
+## Row Handling
+Each row is uniquely identified by a _slug value
+
 **Check if a row exists**
 ```php
 if ( $db->row_isset( 'post_1' ) ) {
@@ -170,10 +172,20 @@ If invalid parameters are detected, execution stops immediately with a clear err
 - Explicit is better than implicit
 This toolkit is designed to be predictable, readable, and boring — in the best possible way.
 
-## License
-MIT
+## Attribution / License Notice
+This repository is licensed under the MIT License.
+
+Any use, copy, modification, or redistribution of this repository
+or any substantial portion of it must retain attribution to the
+original author and the original GitHub repository.
+
+Copyright (c) 2026 Markus Jäger
+https://github.com/m-O-rpheus/ToolkitSQLite3
 
 ---
+
+#### Version 0.94 Changelog:
+- Added LICENSE file and license info in source code.
 
 #### Version 0.93 Changelog:
 - Update.

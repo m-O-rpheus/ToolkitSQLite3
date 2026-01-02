@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 0.94
+### Version 0.95
 
 ---
 
@@ -183,6 +183,16 @@ Copyright (c) 2026 Markus Jäger
 https://github.com/m-O-rpheus/ToolkitSQLite3
 
 ---
+
+### Low-level framework without dependencies:
+```
+ToolkitSQLite3-main
+```
+
+---
+
+#### Version 0.95 Changelog:
+- Update README.md and text indentation ToolkitSQLite3.php
 
 #### Version 0.94 Changelog:
 - Added LICENSE file and license info in source code.

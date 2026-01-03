@@ -131,8 +131,8 @@
 				CREATE TABLE `{$this->tblnam}` (
 					_id INTEGER PRIMARY KEY AUTOINCREMENT,
 					_slug TEXT NOT NULL UNIQUE,
-					_created_at TEXT NOT NULL,
-					_updated_at TEXT NOT NULL
+					_created_at TEXT NOT NULL DEFAULT (datetime('now')),
+					_updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 				);
 			SQL;
 
@@ -294,7 +294,6 @@
 			// Define default values for INSERT operations that are always added.
 			$insertDefaults = [
 				"_slug" => ":slug",
-				"_created_at" => "datetime('now')",
 			];
 
 			// Define default values for DO UPDATE SET operations that are always updated on conflict.
@@ -306,18 +305,18 @@
 			$upsertCustom = array_combine( array_column( $prepare, 'columnName' ), array_keys( $prepare ) );
 
 			// Merge all INSERT columns and values into one set for the final INSERT statement.
-			$insert_merged = array_merge( $insertDefaults, $upsertDefaults, $upsertCustom );
+			$insert_merged = array_merge( $insertDefaults, $upsertCustom );
 			$insert_into   = implode( ',', array_keys( $insert_merged ) );
 			$insert_values = implode( ',', array_values( $insert_merged ) );
 
 			// Merge all columns and values for the DO UPDATE SET part of the UPSERT statement.
 			$do_update_merged = array_merge( $upsertDefaults, $upsertCustom );
-			$do_update_set    = implode( ',', array_map( function( string $k, string $v ) : string { return $k . '=' . $v; }, array_keys( $do_update_merged ), array_values( $do_update_merged ) ) );
+			$do_update_pair   = implode( ',', array_map( function( string $k, string $v ) : string { return $k . '=' . $v; }, array_keys( $do_update_merged ), array_values( $do_update_merged ) ) );
 
 
 
 			$sql = <<<SQL
-				INSERT INTO `{$this->tblnam}` ({$insert_into}) VALUES ({$insert_values}) ON CONFLICT(_slug) DO UPDATE SET {$do_update_set};
+				INSERT INTO `{$this->tblnam}` ({$insert_into}) VALUES ({$insert_values}) ON CONFLICT(_slug) DO UPDATE SET {$do_update_pair};
 			SQL;
 
 			$fnResult = false;

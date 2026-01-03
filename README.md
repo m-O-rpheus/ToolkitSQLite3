@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 0.95
+### Version 0.96
 
 ---
 
@@ -190,6 +190,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 0.96 Changelog:
+- Code Quality.
 
 #### Version 0.95 Changelog:
 - Update README.md and text indentation ToolkitSQLite3.php

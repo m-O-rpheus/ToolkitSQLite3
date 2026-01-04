@@ -62,7 +62,7 @@
 		private static function error_if_empty_sqlite_slug( string $slug ) : void {
 
 			if( strlen( $slug ) === 0 ) {
-				
+
 				trigger_error( 'ERROR: The row slug in SQLite3 must not be empty.', E_USER_ERROR );
 				exit();
 			}
@@ -96,13 +96,15 @@
 
 			if( ( $result = $this->sqlite->query( $sql ) ) !== false ) {
 
-				while( ( $columns = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
+				while( ( $found = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
 
-					if( isset( $columns['name'] ) && isset( $columns['type'] ) ) {
+					if( isset( $found['name'] ) && isset( $found['type'] ) ) {
 
-						$fnResult[$columns['name']] = $columns['type'];
+						$fnResult[$found['name']] = $found['type'];
 					}
 				}
+
+				$result->finalize();
 			}
 
 			/** @var array */
@@ -116,7 +118,8 @@
 		// Instance Table Methods.
 		// -----------------------------------------------------------------------------------------------------------------------------
 
-		// Checks if the table exists by verifying whether column information can be retrieved. Returns true if the table exists, false otherwise.
+		// Checks whether the table exists by verifying that column information can be retrieved.
+		// Returns true if the table, including its columns, exists, false otherwise.
 		public function table_exists() : bool {
 
 			/** @var bool */
@@ -131,8 +134,8 @@
 				CREATE TABLE `{$this->tblnam}` (
 					_id INTEGER PRIMARY KEY AUTOINCREMENT,
 					_slug TEXT NOT NULL UNIQUE,
-					_created_at TEXT NOT NULL DEFAULT (datetime('now')),
-					_updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+					_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 				);
 			SQL;
 
@@ -159,7 +162,8 @@
 		// Instance Column Methods.
 		// -----------------------------------------------------------------------------------------------------------------------------
 
-		// Checks whether a column exists in the current table by verifying the column name in the table's column information. Returns true if the column exists, false otherwise.
+		// Checks whether a column exists in the current table by verifying the column name in the table's column information.
+		// Returns true if the column exists, false otherwise.
 		public function column_exists( string $columnName ) : bool {
 
 			self::error_if_invalid_sqlite_name( $columnName );
@@ -237,22 +241,21 @@
 
 			self::error_if_empty_sqlite_slug( $rowSlug );
 
+			$bindings = array( ['colName' => '_slug', 'paramName' => ':slug', 'paramValue' => $rowSlug] );
+
 			$sql = <<<SQL
 				SELECT 1 FROM `{$this->tblnam}` WHERE _slug = :slug LIMIT 1;
 			SQL;
 
 			$fnResult = false;
 
-			if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
+			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
 
-				if( ( $stmt->bindValue( ':slug', $rowSlug, SQLITE3_TEXT ) ) !== false ) {
+				if( $result->fetchArray( SQLITE3_ASSOC ) !== false ) {
 
-					if( ( $result = $stmt->execute() ) !== false ) {
-
-						$fnResult = $result->fetchArray( SQLITE3_ASSOC ) !== false;
-					}
+					$fnResult = true;
 				}
-			}
+			});
 
 			/** @var bool */
 			return $fnResult;
@@ -265,55 +268,46 @@
 
 			self::error_if_empty_sqlite_slug( $rowSlug );
 
-			$tblinfo = $this->table_info_columns();
-			$mapping = ['INTEGER' => SQLITE3_INTEGER, 'REAL' => SQLITE3_FLOAT, 'BLOB' => SQLITE3_BLOB];
-			$paramno = 0;
-			$prepare = [];
+			$bindIndex = 0;
+			$bindings = array();
 
 			// Build the prepare array which contains all custom columnName => columnValue pairs with their corresponding bind values and type mapping.
 			foreach( $columnNameValuePair as $columnName => $columnValue ) {
 
-				// The following statements are equivalent to column_exists, but prevent multiple executions of table_info_columns.
-				self::error_if_invalid_sqlite_name( $columnName );
+				if( $this->column_exists( $columnName ) ) {
 
-				if( array_key_exists( $columnName, $tblinfo ) ) {
-
-					$typeMapping = ( $columnValue === null ) ? SQLITE3_NULL : ( $mapping[$tblinfo[$columnName]] ?? SQLITE3_TEXT );
-
-					$paramno++;
-					$prepare[':param'.$paramno] = [
-						'columnName'  => $columnName,
-						'columnValue' => $columnValue,
-						'typeMapping' => $typeMapping,
-					];
+					$marker = ':bind' . $bindIndex;
+					$bindIndex++;
+					$bindings[] = ['colName' => $columnName, 'paramName' => $marker, 'paramValue' => $columnValue];
 				}
 			}
 
-			self::error_if_sqlite_parameter_columns_missing( $columnNameValuePair, $prepare );
+			self::error_if_sqlite_parameter_columns_missing( $columnNameValuePair, $bindings );
 
 			// Define default values for INSERT operations that are always added.
 			$insertDefaults = [
-				"_slug" => ":slug",
+				'_slug' => ':slug',
 			];
 
 			// Define default values for DO UPDATE SET operations that are always updated on conflict.
 			$upsertDefaults = [
-				"_updated_at" => "datetime('now')",
+				'_updated_at' => 'CURRENT_TIMESTAMP',
 			];
 
 			// Extract the custom prepared columns from the prepare array for use in SQL statements.
-			$upsertCustom = array_combine( array_column( $prepare, 'columnName' ), array_keys( $prepare ) );
+			$upsertCustom = array_combine( array_column( $bindings, 'colName' ), array_column( $bindings, 'paramName' ) );
 
 			// Merge all INSERT columns and values into one set for the final INSERT statement.
 			$insert_merged = array_merge( $insertDefaults, $upsertCustom );
-			$insert_into   = implode( ',', array_keys( $insert_merged ) );
-			$insert_values = implode( ',', array_values( $insert_merged ) );
+			$insert_into   = implode( ', ', array_keys( $insert_merged ) );
+			$insert_values = implode( ', ', array_values( $insert_merged ) );
 
 			// Merge all columns and values for the DO UPDATE SET part of the UPSERT statement.
 			$do_update_merged = array_merge( $upsertDefaults, $upsertCustom );
-			$do_update_pair   = implode( ',', array_map( function( string $k, string $v ) : string { return $k . '=' . $v; }, array_keys( $do_update_merged ), array_values( $do_update_merged ) ) );
+			$do_update_pair   = implode( ', ', array_map( function( string $k, string $v ) : string { return $k . '=' . $v; }, array_keys( $do_update_merged ), array_values( $do_update_merged ) ) );
 
-
+			// Extend Execute Statement to include the Slug parameter.
+			$bindings[] = ['colName' => '_slug', 'paramName' => ':slug', 'paramValue' => $rowSlug];
 
 			$sql = <<<SQL
 				INSERT INTO `{$this->tblnam}` ({$insert_into}) VALUES ({$insert_values}) ON CONFLICT(_slug) DO UPDATE SET {$do_update_pair};
@@ -321,29 +315,10 @@
 
 			$fnResult = false;
 
-			if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
+			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
 
-				$comparison = [];
-
-				if( ( $stmt->bindValue( ':slug', $rowSlug, SQLITE3_TEXT ) ) !== false ) {
-
-					foreach( $prepare as $prepareParam => $prepareArr ) {
-
-						if( ( $stmt->bindValue( $prepareParam, $prepareArr['columnValue'], $prepareArr['typeMapping'] ) ) !== false ) {
-
-							$comparison[$prepareParam] = $prepareArr;
-						}
-					}
-				}
-
-				if( $prepare === $comparison ) {
-
-					if( ( $result = $stmt->execute() ) !== false ) {
-
-						$fnResult = true;
-					}
-				}
-			}
+				$fnResult = true;
+			});
 
 			/** @var bool */
 			return $fnResult;
@@ -355,25 +330,241 @@
 
 			self::error_if_empty_sqlite_slug( $rowSlug );
 
+			$bindings = array( ['colName' => '_slug', 'paramName' => ':slug', 'paramValue' => $rowSlug] );
+
 			$sql = <<<SQL
 				DELETE FROM `{$this->tblnam}` WHERE _slug = :slug;
 			SQL;
 
 			$fnResult = false;
 
-			if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
+			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
 
-				if( ( $stmt->bindValue( ':slug', $rowSlug, SQLITE3_TEXT ) ) !== false ) {
-
-					if( ( $result = $stmt->execute() ) !== false ) {
-
-						$fnResult = true;
-					}
-				}
-			}
+				$fnResult = true;
+			});
 
 			/** @var bool */
 			return $fnResult;
+		}
+
+
+
+
+
+		// Instance Database Select Methods.
+		// -----------------------------------------------------------------------------------------------------------------------------
+
+		// Select specific records based on the provided arguments array.
+		public function select( array $args ) : array {
+
+			// Builder function for DISTINCT.
+			$buildDistinct = function() use ( $args ) : string {
+
+				/** @var string */
+				return isset( $args['distinct'] ) && $args['distinct'] === true ? 'DISTINCT' : '';
+			};
+
+			// Builder function for COLUMNS.
+			$buildColumns = function() use ( $args ) : string {
+
+				$temp = [];
+
+				if( isset( $args['columns'] ) && is_array( $args['columns'] ) ) {
+
+					foreach( $args['columns'] as $columnName ) {
+
+						self::error_if_invalid_sqlite_name( $columnName );
+
+						$temp[] = $columnName;
+					}
+				}
+
+				/** @var string */
+				return !empty( $temp ) ? implode( ', ', $temp ) : '*';
+			};
+
+			// Builder function for WHERE.
+			$bindIndex = 0;
+			$bindings = array();
+			$buildWhere = function() use ( $args, &$bindIndex, &$bindings ) : string {
+
+				$helperWhereRecursive = function( array $node ) use ( &$helperWhereRecursive, &$bindIndex, &$bindings ) : string {
+
+					// 1. LOGICAL CONTAINERS: AND / OR
+					if( isset( $node['AND'] ) && is_array( $node['AND'] ) ) {
+
+						return '(' . implode(' AND ', array_filter( array_map( $helperWhereRecursive, $node['AND'] ) ) ) . ')';
+					}
+
+					else if( isset( $node['OR'] ) && is_array( $node['OR'] ) ) {
+
+						return '(' . implode(' OR ', array_filter( array_map( $helperWhereRecursive, $node['OR'] ) ) ) . ')';
+					}
+
+					// 2. NOT (Unary, rekursiv)
+					else if( isset( $node['NOT'] ) && is_array( $node['NOT'] ) ) {
+
+						return 'NOT (' . $helperWhereRecursive( $node['NOT'] ) . ')';
+					}
+
+					// 3. LEAF-NODES: einfache Bedingungen
+					else if( isset( $node['column'] ) && isset( $node['op'] ) ) {
+
+						self::error_if_invalid_sqlite_name( $node['column'] );
+
+						if( $node['op'] === 'IS NULL' ) {
+
+							return $node['column'] . ' IS NULL';
+						}
+
+						else if( $node['op'] === 'EXISTS' ) {
+							// TODO
+						}
+
+						else if( $node['op'] === 'IN' ) {
+							// TODO
+						}
+
+						else if( $node['op'] === 'BETWEEN' ) {
+							// TODO
+						}
+
+						else if( in_array( $node['op'], array( '=', '!=', '<', '<=', '>', '>=', 'LIKE' ) ) && isset( $node['value'] ) ) {
+
+							$marker = ':bind' . $bindIndex;
+							$bindIndex++;
+							$bindings[] = ['colName' => $node['column'], 'paramName' => $marker, 'paramValue' => $node['value']];
+
+							return $node['column'] . ' ' . $node['op'] . ' ' . $marker;
+						}
+						else {
+
+							// ERROR
+						}
+					}
+					else {
+
+						// ERROR
+					}
+
+					return '';
+				};
+
+
+				/** @var string */
+				return isset( $args['where'] ) && is_array( $args['where'] ) ? 'WHERE ' . $helperWhereRecursive( $args['where'] ) : '';
+			};
+
+			// Builder function for ORDER BY.
+			$buildOrderBy = function() use ( $args ) : string {
+
+				$temp = [];
+
+				if( isset( $args['orderby'] ) && is_array( $args['orderby'] ) ) {
+
+					foreach( $args['orderby'] as $columnName => $sort ) {
+
+						self::error_if_invalid_sqlite_name( $columnName );
+
+						$temp[] = $columnName . ' ' . ( $sort === 'DESC' ? 'DESC' : 'ASC' );
+					}
+				}
+
+				/** @var string */
+				return !empty( $temp ) ? 'ORDER BY ' . implode( ', ', $temp ) : '';
+			};
+
+			// Builder function for LIMIT.
+			$buildLimit = function() use ( $args ) : string {
+
+				/** @var string */
+				return isset( $args['limit'] ) && is_int( $args['limit'] ) ? 'LIMIT ' . max( 0, $args['limit'] ) : '';
+			};
+
+			// Builder function for OFFSET.
+			$buildOffset = function() use ( $args ) : string {
+
+				/** @var string */
+				return isset( $args['offset'] ) && is_int( $args['offset'] ) ? 'OFFSET ' . max( 0, $args['offset'] ) : '';
+			};
+
+			$sql = <<<SQL
+				SELECT {$buildDistinct()} {$buildColumns()} FROM `{$this->tblnam}` {$buildWhere()} {$buildOrderBy()} {$buildLimit()} {$buildOffset()};
+			SQL;
+
+			$fnResult = [];
+
+			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
+
+				while( ( $found = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
+
+					$fnResult[] = $found;
+				}
+			});
+
+			/** @var array */
+			return $fnResult;
+		}
+
+
+
+
+
+		// Instance Helper Methods.
+		// -----------------------------------------------------------------------------------------------------------------------------
+
+		// Executes a prepared SQLite statement. The method expects an SQL string with placeholders (e.g. :bind0, :slug) as well as an array of bind data containing colName, paramName, and paramValue.
+		// The SQLite3 affinity type is mapped based on the declared column type of the table. The statement is only executed if all bindings have been successfully set.
+		private function consume_query( string $sql, array $bindings, callable $callback ) : void {
+
+			// Prepare the SQL statement.
+			if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
+
+				$comparison = [];
+
+				// Retrieves table information and defines a mapping array from declared column types to SQLite3 affinity constants.
+				$tableinfo   = $this->table_info_columns();
+				$affinitymap = array( 'INTEGER' => SQLITE3_INTEGER, 'REAL' => SQLITE3_FLOAT, 'BLOB' => SQLITE3_BLOB );
+
+				foreach( $bindings as $key => $binding ) {
+
+					// Skip invalid bind data entries that are missing required keys.
+					if( array_key_exists( 'colName', $binding ) && array_key_exists( 'paramName', $binding ) && array_key_exists( 'paramValue', $binding ) ) {
+
+						$colName    = $binding['colName'];    // String
+						$paramName  = $binding['paramName'];  // String
+						$paramValue = $binding['paramValue']; // Mixed
+
+						// Performs the mapping using the mapping array. The SQLite3 affinity type is matched against the already declared column type of the table.
+						// Possible types are INTEGER, REAL, BLOB, and TEXT. Additionally, NULL has a special role and is always treated as SQLITE3_NULL, regardless of the declared column type.
+						// The conversion of values from the variables is handled by SQLite3.
+						$affinitytype = ( $paramValue === null ) ? SQLITE3_NULL : ( ( isset( $tableinfo[$colName] ) && isset( $affinitymap[$tableinfo[$colName]] ) ) ? $affinitymap[$tableinfo[$colName]] : SQLITE3_TEXT );
+
+						// Bind value to the prepared statement.
+						if( ( $stmt->bindValue( $paramName, $paramValue, $affinitytype ) ) !== false ) {
+
+							$comparison[$key] = $binding;
+						}
+					}
+				}
+
+				if( $bindings === $comparison ) {
+
+					// Execute the statement only if all values were bound successfully.
+					if( ( $result = $stmt->execute() ) !== false ) {
+
+						try {
+
+							/** @param callable(SQLite3Result) $callback */
+							$callback( $result );
+						}
+						finally {
+
+							$result->finalize();
+						}
+					}
+				}
+			}
 		}
 
 

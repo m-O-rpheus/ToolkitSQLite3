@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 0.96
+### Version 0.97
 
 ---
 
@@ -34,14 +34,6 @@ $db = new ToolkitSQLite3( 'database.sqlite3', 'example_table' );
 ```
 
 ## Table Handling
-**Check if a table exists**
-```php
-if ( $db->table_exists() ) {
-    echo 'Table exists';
-}
-// Last check 01.01.2026
-```
-
 **Create a table (ignored if it already exists)**
 ```php
 $result = $db->table_add_ignore();
@@ -56,6 +48,14 @@ if ( $result === 1 ) {
 // Last check 01.01.2026
 ```
 
+**Check if a table exists**
+```php
+if ( $db->table_exists() ) {
+    echo 'Table exists';
+}
+// Last check 01.01.2026
+```
+
 **Delete a table (ignored if it does not exist)**
 ```php
 $result = $db->table_delete_ignore();
@@ -63,6 +63,8 @@ $result = $db->table_delete_ignore();
 ```
 
 ## Column Handling
+Defines the column names and their corresponding declared column types. Possible values are: INTEGER, REAL, BLOB, TEXT.
+
 **Add a column (ignored if it already exists)**
 ```php
 $db->column_add_ignore( 'title', 'TEXT' );
@@ -71,7 +73,7 @@ $db->column_add_ignore( 'data', 'BLOB' );
 // Last check 01.01.2026
 ```
 
-**Create table and multiple columns at once**
+**Create table and multiple columns at once (ignored if it already exists)**
 ```php
 $db->table_column_add_ignore( [
     'title'   => 'TEXT',
@@ -89,7 +91,7 @@ if ( $db->column_exists( 'title' ) ) {
 // Last check 01.01.2026
 ```
 
-**Remove a column**
+**Delete a column (ignored if it does not exist)**
 ```php
 $db->column_delete_ignore( 'views' );
 // Last check 01.01.2026
@@ -140,7 +142,7 @@ foreach ( $items as $slug => $value ) {
 // Last check 01.01.2026
 ```
 
-**Delete a row**
+**Remove a row**
 ```php
 $db->row_remove( 'post_1' );
 // Last check 01.01.2026
@@ -190,6 +192,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 0.97 Changelog:
+- Code Quality.
 
 #### Version 0.96 Changelog:
 - Code Quality.

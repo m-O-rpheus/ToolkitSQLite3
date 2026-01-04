@@ -380,11 +380,11 @@
 
 
 
-		// ...
+		// Instance Database Select Methods.
 		// -----------------------------------------------------------------------------------------------------------------------------
 
-		// ...
-		public function select() : array {
+		// Select specific records based on the provided arguments array.
+		public function select( array $args ) : array {
 
 			$args = array(
 
@@ -415,6 +415,7 @@
 			// Builder function for DISTINCT.
 			$buildDistinct = function( array $args ) : string {
 
+				/** @var string */
 				return ( isset( $args['distinct'] ) && $args['distinct'] === true ) ? 'DISTINCT' : '';
 			};
 
@@ -423,7 +424,7 @@
 			// Builder function for COLUMNS.
 			$buildColumns = function( array $args ) : string {
 
-				$temp = array();
+				$temp = [];
 
 				if( isset( $args['columns'] ) && is_array( $args['columns'] ) ) {
 
@@ -435,6 +436,7 @@
 					}
 				}
 
+				/** @var string */
 				return !empty( $temp ) ? implode( ', ', $temp ) : '*';
 			};
 
@@ -443,15 +445,16 @@
 			// Builder function for WHERE.
 			$buildWhere = function( array $args ) : string {
 
-				// In Progress
-				$temp = array();
+				// TODO: In Progress
+				$temp = [];
 
 				if( isset( $args['where'] ) && is_array( $args['where'] ) ) {
 
-					// In Progress
+					// TODO: In Progress
 				}
-				// In Progress
+				// TODO: In Progress
 
+				/** @var string */
 				return '';
 			};
 
@@ -460,7 +463,7 @@
 			// Builder function for ORDER BY.
 			$buildOrderBy = function( array $args ) : string {
 
-				$temp = array();
+				$temp = [];
 
 				if( isset( $args['orderby'] ) && is_array( $args['orderby'] ) ) {
 
@@ -472,6 +475,7 @@
 					}
 				}
 
+				/** @var string */
 				return !empty( $temp ) ? 'ORDER BY ' . implode( ', ', $temp ) : '';
 			};
 
@@ -487,6 +491,7 @@
 					$temp = 'LIMIT ' . max( 0, $args['limit'] );
 				}
 
+				/** @var string */
 				return !empty( $temp ) ? $temp : '';
 			};
 
@@ -502,6 +507,7 @@
 					$temp = 'OFFSET ' . max( 0, $args['offset'] );
 				}
 
+				/** @var string */
 				return !empty( $temp ) ? $temp : '';
 			};
 
@@ -521,8 +527,21 @@
 				SELECT {$distinct} {$columns} FROM `{$this->tblnam}` {$where} {$orderBy} {$limit} {$offset};
 			SQL;
 
+			$fnResult = [];
+
+			if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
+
+				if( ( $result = $stmt->execute() ) !== false ) {
+
+					while( ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
+						
+						$fnResult[] = $row;
+					}
+				}
+			}
+
 			/** @var array */
-			return array();
+			return $fnResult;
 		}
 
 

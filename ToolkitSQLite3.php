@@ -306,12 +306,12 @@
 
 			// Merge all INSERT columns and values into one set for the final INSERT statement.
 			$insert_merged = array_merge( $insertDefaults, $upsertCustom );
-			$insert_into   = implode( ',', array_keys( $insert_merged ) );
-			$insert_values = implode( ',', array_values( $insert_merged ) );
+			$insert_into   = implode( ', ', array_keys( $insert_merged ) );
+			$insert_values = implode( ', ', array_values( $insert_merged ) );
 
 			// Merge all columns and values for the DO UPDATE SET part of the UPSERT statement.
 			$do_update_merged = array_merge( $upsertDefaults, $upsertCustom );
-			$do_update_pair   = implode( ',', array_map( function( string $k, string $v ) : string { return $k . '=' . $v; }, array_keys( $do_update_merged ), array_values( $do_update_merged ) ) );
+			$do_update_pair   = implode( ', ', array_map( function( string $k, string $v ) : string { return $k . '=' . $v; }, array_keys( $do_update_merged ), array_values( $do_update_merged ) ) );
 
 
 
@@ -374,6 +374,155 @@
 
 			/** @var bool */
 			return $fnResult;
+		}
+
+
+
+
+
+		// ...
+		// -----------------------------------------------------------------------------------------------------------------------------
+
+		// ...
+		public function select() : array {
+
+			$args = array(
+
+				'distinct' => true,
+
+				'columns' => array(
+					'id',
+					'username',
+					'email',
+					'age',
+					'created_at'
+				),
+
+				'orderby' => array(
+					'created_at' => 'DESC',
+					'email' => 'ASC'
+				),
+
+				'limit'  => 10,
+				'offset' => 20
+			);
+
+
+
+
+
+
+			// Builder function for DISTINCT.
+			$buildDistinct = function( array $args ) : string {
+
+				return ( isset( $args['distinct'] ) && $args['distinct'] === true ) ? 'DISTINCT' : '';
+			};
+
+
+
+			// Builder function for COLUMNS.
+			$buildColumns = function( array $args ) : string {
+
+				$temp = array();
+
+				if( isset( $args['columns'] ) && is_array( $args['columns'] ) ) {
+
+					foreach( $args['columns'] as $columnName ) {
+
+						self::error_if_invalid_sqlite_name( $columnName );
+
+						$temp[] = $columnName;
+					}
+				}
+
+				return !empty( $temp ) ? implode( ', ', $temp ) : '*';
+			};
+
+
+
+			// Builder function for WHERE.
+			$buildWhere = function( array $args ) : string {
+
+				// In Progress
+				$temp = array();
+
+				if( isset( $args['where'] ) && is_array( $args['where'] ) ) {
+
+					// In Progress
+				}
+				// In Progress
+
+				return '';
+			};
+
+
+
+			// Builder function for ORDER BY.
+			$buildOrderBy = function( array $args ) : string {
+
+				$temp = array();
+
+				if( isset( $args['orderby'] ) && is_array( $args['orderby'] ) ) {
+
+					foreach( $args['orderby'] as $columnName => $sort ) {
+
+						self::error_if_invalid_sqlite_name( $columnName );
+
+						$temp[] = $columnName . ' ' . ( ( $sort === 'DESC' ) ? 'DESC' : 'ASC' );
+					}
+				}
+
+				return !empty( $temp ) ? 'ORDER BY ' . implode( ', ', $temp ) : '';
+			};
+
+
+
+			// Builder function for LIMIT.
+			$buildLimit = function( array $args ) : string {
+
+				$temp = '';
+
+				if( isset( $args['limit'] ) && is_int( $args['limit'] ) ) {
+
+					$temp = 'LIMIT ' . max( 0, $args['limit'] );
+				}
+
+				return !empty( $temp ) ? $temp : '';
+			};
+
+
+
+			// Builder function for OFFSET.
+			$buildOffset = function( array $args ) : string {
+
+				$temp = '';
+
+				if( isset( $args['offset'] ) && is_int( $args['offset'] ) ) {
+
+					$temp = 'OFFSET ' . max( 0, $args['offset'] );
+				}
+
+				return !empty( $temp ) ? $temp : '';
+			};
+
+
+
+			// Call helper functions to build each part of the SQL query.
+			$distinct = $buildDistinct( $args );
+			$columns  = $buildColumns ( $args );
+			$where    = $buildWhere   ( $args );
+			$orderBy  = $buildOrderBy ( $args );
+			$limit    = $buildLimit   ( $args );
+			$offset   = $buildOffset  ( $args );
+
+
+
+			$sql = <<<SQL
+				SELECT {$distinct} {$columns} FROM `{$this->tblnam}` {$where} {$orderBy} {$limit} {$offset};
+			SQL;
+
+			/** @var array */
+			return array();
 		}
 
 

@@ -388,8 +388,10 @@
 
 			$args = array(
 
+				// Gesetzt mit dem wert true, wende distinct an. Bei weglassen oder false nicht.
 				'distinct' => true,
 
+				// Gesetzt wende die select anweisung auf folgende spalten an. Bei weglassen auf alle (Standardwert *).
 				'columns' => array(
 					'id',
 					'username',
@@ -398,12 +400,16 @@
 					'created_at'
 				),
 
+				// DESC oder ASC möglich. Angaben müssen in Uppercase erfolgen. Bei weglassen keine sortierung anwenden.
 				'orderby' => array(
 					'created_at' => 'DESC',
 					'email' => 'ASC'
 				),
 
+				// Zahl als Integer größer als 0. Bei weglassen kein Limit anwenden.
 				'limit'  => 10,
+
+				// Zahl als Integer größer als 0. Bei weglassen kein Offset anwenden.
 				'offset' => 20
 			);
 

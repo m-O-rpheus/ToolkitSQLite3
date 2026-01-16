@@ -242,7 +242,7 @@
 			SQL;
 
 			/** @var bool */
-			return ( $result = $this->execute_statement( $sql, [['columnName'=> '_slug', 'bindMarker' => ':slug', 'origValue' => $rowSlug]] ) ) !== false && $result->fetchArray( SQLITE3_ASSOC ) !== false;
+			return ( $result = $this->execute_statement( $sql, [['columnName'=> '_slug', 'bindMarker' => ':slug', 'columnValue' => $rowSlug]] ) ) !== false && $result->fetchArray( SQLITE3_ASSOC ) !== false;
 		}
 
 
@@ -252,8 +252,8 @@
 
 			self::error_if_empty_sqlite_slug( $rowSlug );
 
-			$bindIndex  = 0;
-			$bindValues = [];
+			$bindIndex = 0;
+			$bindDatas = [];
 
 			// Build the prepare array which contains all custom columnName => columnValue pairs with their corresponding bind values and type mapping.
 			foreach( $columnNameValuePair as $columnName => $columnValue ) {
@@ -262,11 +262,11 @@
 
 					$marker = ':bind' . $bindIndex;
 					$bindIndex++;
-					$bindValues[] = ['columnName'=> $columnName, 'bindMarker' => $marker, 'origValue' => $columnValue];
+					$bindDatas[] = ['columnName'=> $columnName, 'bindMarker' => $marker, 'columnValue' => $columnValue];
 				}
 			}
 
-			self::error_if_sqlite_parameter_columns_missing( $columnNameValuePair, $bindValues );
+			self::error_if_sqlite_parameter_columns_missing( $columnNameValuePair, $bindDatas );
 
 			// Define default values for INSERT operations that are always added.
 			$insertDefaults = [
@@ -279,7 +279,7 @@
 			];
 
 			// Extract the custom prepared columns from the prepare array for use in SQL statements.
-			$upsertCustom = array_combine( array_column( $bindValues, 'columnName' ), array_column( $bindValues, 'bindMarker' ) );
+			$upsertCustom = array_combine( array_column( $bindDatas, 'columnName' ), array_column( $bindDatas, 'bindMarker' ) );
 
 			// Merge all INSERT columns and values into one set for the final INSERT statement.
 			$insert_merged = array_merge( $insertDefaults, $upsertCustom );
@@ -291,14 +291,14 @@
 			$do_update_pair   = implode( ', ', array_map( function( string $k, string $v ) : string { return $k . '=' . $v; }, array_keys( $do_update_merged ), array_values( $do_update_merged ) ) );
 
 			// Extend execute_statement to include the _slug parameter.
-			$bindValues[] = ['columnName'=> '_slug', 'bindMarker' => ':slug', 'origValue' => $rowSlug];
+			$bindDatas[] = ['columnName'=> '_slug', 'bindMarker' => ':slug', 'columnValue' => $rowSlug];
 
 			$sql = <<<SQL
 				INSERT INTO `{$this->tblnam}` ({$insert_into}) VALUES ({$insert_values}) ON CONFLICT(_slug) DO UPDATE SET {$do_update_pair};
 			SQL;
 
 			/** @var bool */
-			return $this->execute_statement( $sql, $bindValues ) !== false;
+			return $this->execute_statement( $sql, $bindDatas ) !== false;
 		}
 
 
@@ -312,7 +312,7 @@
 			SQL;
 
 			/** @var bool */
-			return $this->execute_statement( $sql, [['columnName'=> '_slug', 'bindMarker' => ':slug', 'origValue' => $rowSlug]] ) !== false;
+			return $this->execute_statement( $sql, [['columnName'=> '_slug', 'bindMarker' => ':slug', 'columnValue' => $rowSlug]] ) !== false;
 		}
 
 
@@ -353,10 +353,10 @@
 
 			// Builder function for WHERE.
 			$bindIndex  = 0;
-			$bindValues = [];
-			$buildWhere = function() use ( $args, &$bindIndex, &$bindValues ) : string {
+			$bindDatas  = [];
+			$buildWhere = function() use ( $args, &$bindIndex, &$bindDatas ) : string {
 
-				$helperWhereRecursive = function( array $node ) use ( &$helperWhereRecursive, &$bindIndex, &$bindValues ) : string {
+				$helperWhereRecursive = function( array $node ) use ( &$helperWhereRecursive, &$bindIndex, &$bindDatas ) : string {
 
 					// 1. LOGICAL CONTAINERS: AND / OR
 					if( isset( $node['AND'] ) && is_array( $node['AND'] ) ) {
@@ -401,7 +401,7 @@
 
 							$marker = ':bind' . $bindIndex;
 							$bindIndex++;
-							$bindValues[] = ['columnName'=> $node['column'], 'bindMarker' => $marker, 'origValue' => $node['value']];
+							$bindDatas[] = ['columnName'=> $node['column'], 'bindMarker' => $marker, 'columnValue' => $node['value']];
 
 							return $node['column'] . ' ' . $node['op'] . ' ' . $marker;
 						}
@@ -462,7 +462,7 @@
 
 			$fnResult = [];
 
-			if( ( $result = $this->execute_statement( $sql, $bindValues ) ) !== false ) {
+			if( ( $result = $this->execute_statement( $sql, $bindDatas ) ) !== false ) {
 
 				while( ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
 				
@@ -481,57 +481,52 @@
 		// Instance Helper Methods.
 		// -----------------------------------------------------------------------------------------------------------------------------
 
-		// Maps a PHP value to the appropriate SQLite3 type.
-		// Returns SQLITE3_NULL for null, SQLITE3_INTEGER, SQLITE3_FLOAT, SQLITE3_BLOB based on table info, or SQLITE3_TEXT by default.
-		private function type_mapping( string $columnName, mixed $columnValue ) : int {
-
-			$fnResult = SQLITE3_TEXT;
-
-			if( $columnValue === null ) {
-
-				$fnResult = SQLITE3_NULL;
-			}
-			else {
-
-				$info = $this->table_info_columns();
-				$map  = array( 'INTEGER' => SQLITE3_INTEGER, 'REAL' => SQLITE3_FLOAT, 'BLOB' => SQLITE3_BLOB );
-
-				if( isset( $info[$columnName] ) && isset( $map[$info[$columnName]] ) ) {
-
-					$fnResult = $map[$info[$columnName]];
-				}
-			}
-
-			/** @var int */
-			return $fnResult;
-		}
-
-
-		// Executes a prepared SQLite3 statement with bound values.
-		// SQL with placeholders (e.g., :bind0, :slug) and an array with columnName, bindMarker, origValue.
-		private function execute_statement( string $sql, array $bindValues ) : false|SQLite3Result {
+		// Executes a prepared SQLite statement. The method expects SQL with placeholders (e.g. :bind0, :slug) and bind data containing columnName, bindMarker and columnValue.
+		// It automatically determines the correct SQLite3 bind type and executes the statement only if all bindings were successful.
+		private function execute_statement( string $sql, array $bindDatas ) : false|SQLite3Result {
 
 			$fnResult = false;
 
+			// Prepare the SQL statement.
 			if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
 
 				$comparison = [];
 
-				foreach( $bindValues as $key => $arr ) {
+				// Fetch table information and define a mapping of SQLite column types to SQLite3 constants.
+				$tblInfo = $this->table_info_columns();
+				$typeMap = array( 'INTEGER' => SQLITE3_INTEGER, 'REAL' => SQLITE3_FLOAT, 'BLOB' => SQLITE3_BLOB );
 
-					if( ( $stmt->bindValue( $arr['bindMarker'], $arr['origValue'], $this->type_mapping( $arr['columnName'], $arr['origValue'] ) ) ) !== false ) {
+				foreach( $bindDatas as $paramKey => $bindData ) {
 
-						$comparison[$key] = $arr;
+					// Determine the SQLite3 bind type.
+					if( $bindData['columnValue'] === null ) {
+
+						$type = SQLITE3_NULL;
+					}
+					else if( isset( $tblInfo[$bindData['columnName']] ) && isset( $typeMap[$tblInfo[$bindData['columnName']]] ) ) {
+
+						$type = $typeMap[$tblInfo[$bindData['columnName']]];
+					}
+					else {
+
+						$type = SQLITE3_TEXT;
+					}
+
+					// Bind value to the prepared statement.
+					if( ( $stmt->bindValue( $bindData['bindMarker'], $bindData['columnValue'], $type ) ) !== false ) {
+
+						$comparison[$paramKey] = $bindData;
 					}
 				}
 
-				if( $bindValues === $comparison && ( $result = $stmt->execute() ) !== false ) {
+				// Execute the statement only if all values were bound successfully.
+				if( $bindDatas === $comparison && ( $result = $stmt->execute() ) !== false ) {
 
 					$fnResult = $result;
 				}
 			}
 
-			/** @var array */
+			/** @var false|SQLite3Result */
 			return $fnResult;
 		}
 

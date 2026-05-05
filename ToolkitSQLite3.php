@@ -18,539 +18,116 @@
 	class ToolkitSQLite3 {
 
 
-		// Constructor.
-		// -----------------------------------------------------------------------------------------------------------------------------
+		use ToolkitSQLite3_methods_errors;
+		use ToolkitSQLite3_methods_table;
+		use ToolkitSQLite3_methods_column;
+		use ToolkitSQLite3_methods_row;
+		use ToolkitSQLite3_methods_select;
+		use ToolkitSQLite3_methods_select__parts;
+		use ToolkitSQLite3_methods_select__where;
 
-		protected readonly SQLite3 $sqlite;
-		protected readonly string  $tblnam;
+
+
+		protected static $tblprefix = 'toolkitsqlite3_'; // Prefix used to identify the context, prepended to table names.
+		protected static $typealias = '_typeof_';        // Temporary prefix for generated SELECT alias columns that store SQLite3 value types.
+		protected static $maxlength = 512;               // Maximum length for table and column names (excluding the prefix).
+
+
+
+		private readonly SQLite3 $sqlite;
+		private readonly string  $tblnam;
 
 		public function __construct( string $fileName, string $tableName ) {
 
 			self::error_if_invalid_sqlite_name( $tableName );
 
 			$this->sqlite = new SQLite3( $fileName );
-			$this->tblnam = $tableName;
+			$this->tblnam = static::$tblprefix . $tableName;
+		}
+
+		public function __destruct() {
+
+			$this->sqlite->close();
 		}
 
 
 
+		// Generates a unique SQL parameter token (e.g. :bind1, :bind2, ...).
+		// Used only to ensure unique binding names within the instance.
+		private int $i = 0;
 
+		private function get_unique_token() : string {
 
-		// Error Handlers.
-		// -----------------------------------------------------------------------------------------------------------------------------
+			$this->i++;
 
-		private static function error_if_invalid_sqlite_name( string $name ) : void {
-
-			if( preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
-
-				trigger_error( 'ERROR: The table or column name in SQLite3 is invalid. It may contain only letters, numbers, or underscores.', E_USER_ERROR );
-				exit();
-			}
-		}
-
-
-		private static function error_if_invalid_sqlite_type( string $type ) : void {
-
-			if( !in_array( $type, ['INTEGER', 'REAL', 'BLOB', 'TEXT'], true ) ) {
-
-				trigger_error( 'ERROR: The SQLite3 column type is invalid. Allowed types are: INTEGER, REAL, BLOB, TEXT.', E_USER_ERROR );
-				exit();
-			}
-		}
-
-
-		private static function error_if_empty_sqlite_slug( string $slug ) : void {
-
-			if( strlen( $slug ) === 0 ) {
-
-				trigger_error( 'ERROR: The row slug in SQLite3 must not be empty.', E_USER_ERROR );
-				exit();
-			}
-		}
-
-
-		private static function error_if_sqlite_parameter_columns_missing( array $arrbefore, array $arrafter ) : void {
-
-			if( count( $arrbefore ) !== count( $arrafter ) ) {
-
-				trigger_error( 'ERROR: Invalid function parameter array for the SQLite3 operation. Not all specified columns exist in the database table. Please create all required columns first or adjust the function parameter array accordingly.', E_USER_ERROR );
-				exit();
-			}
+			/** @var string */
+			return ':bind' . $this->i;
 		}
 
 
 
-
-
-		// Instance Common Methods.
-		// -----------------------------------------------------------------------------------------------------------------------------
-
-		// Retrieves an array of column names and their types for the current table. Returns an empty array if the table does not exist or on query error.
-		public function table_info_columns() : array {
-
-			$sql = <<<SQL
-				PRAGMA table_info(`{$this->tblnam}`);
-			SQL;
-
-			$fnResult = [];
-
-			if( ( $result = $this->sqlite->query( $sql ) ) !== false ) {
-
-				while( ( $found = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
-
-					if( isset( $found['name'] ) && isset( $found['type'] ) ) {
-
-						$fnResult[$found['name']] = $found['type'];
-					}
-				}
-
-				$result->finalize();
-			}
-
-			/** @var array */
-			return $fnResult;
-		}
-
-
-
-
-
-		// Instance Table Methods.
-		// -----------------------------------------------------------------------------------------------------------------------------
-
-		// Checks whether the table exists by verifying that column information can be retrieved.
-		// Returns true if the table, including its columns, exists, false otherwise.
-		public function table_exists() : bool {
-
-			/** @var bool */
-			return !empty( $this->table_info_columns() );
-		}
-
-
-		// Creates a table if it does not already exist. Returns 1 if the table was created successfully, 2 if it already exists, or 0 on query error.
-		public function table_add_ignore() : int {
-
-			$sql = <<<SQL
-				CREATE TABLE `{$this->tblnam}` (
-					_id INTEGER PRIMARY KEY AUTOINCREMENT,
-					_slug TEXT NOT NULL UNIQUE,
-					_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-				);
-			SQL;
-
-			/** @var int */
-			return $this->table_exists() ? 2 : ( $this->sqlite->exec( $sql ) !== false ? 1 : 0 );
-		}
-
-
-		// Drops the table if it exists. Returns 1 if the table was removed successfully, 2 if it did not exist, or 0 on query error.
-		public function table_delete_ignore() : int {
-
-			$sql = <<<SQL
-				DROP TABLE `{$this->tblnam}`;
-			SQL;
-
-			/** @var int */
-			return $this->table_exists() ? ( $this->sqlite->exec( $sql ) !== false ? 1 : 0 ) : 2;
-		}
-
-
-
-
-
-		// Instance Column Methods.
-		// -----------------------------------------------------------------------------------------------------------------------------
-
-		// Checks whether a column exists in the current table by verifying the column name in the table's column information.
-		// Returns true if the column exists, false otherwise.
-		public function column_exists( string $columnName ) : bool {
-
-			self::error_if_invalid_sqlite_name( $columnName );
-
-			/** @var bool */
-			return array_key_exists( $columnName, $this->table_info_columns() );
-		}
-
-
-		// Adds a column to the table if it does not exist. Returns 1 if the column was added successfully, 2 if it already exists, or 0 on query error.
-		public function column_add_ignore( string $columnName, string $columnType ) : int {
-
-			self::error_if_invalid_sqlite_name( $columnName );
-			self::error_if_invalid_sqlite_type( $columnType );
-
-			$sql = <<<SQL
-				ALTER TABLE `{$this->tblnam}` ADD COLUMN `{$columnName}` {$columnType};
-			SQL;
-
-			/** @var int */
-			return $this->column_exists( $columnName ) ? 2 : ( $this->sqlite->exec( $sql ) !== false ? 1 : 0 );
-		}
-
-
-		// Removes a column from the table if it exists. Returns 1 if the column was removed successfully, 2 if it did not exist, or 0 on query error.
-		public function column_delete_ignore( string $columnName ) : int {
-
-			self::error_if_invalid_sqlite_name( $columnName );
-
-			$sql = <<<SQL
-				ALTER TABLE `{$this->tblnam}` DROP COLUMN `{$columnName}`;
-			SQL;
-
-			/** @var int */
-			return $this->column_exists( $columnName ) ? ( $this->sqlite->exec( $sql ) !== false ? 1 : 0 ) : 2;
-		}
-
-
-
-
-
-		// Instance Combination Methods.
-		// -----------------------------------------------------------------------------------------------------------------------------
-
-		// Creates a table and multiple columns in a single call. Existing tables or columns are ignored.
-		// Returns true if the query executed successfully (table and all columns created or already existed), or false on query error.
-		public function table_column_add_ignore( array $columnNameTypePair ) : bool {
-
-			$comparison = [];
-
-			if( $this->table_add_ignore() > 0 ) {
-
-				foreach( $columnNameTypePair as $columnName => $columnType ) {
-
-					if( $this->column_add_ignore( $columnName, $columnType ) > 0 ) {
-
-						$comparison[$columnName] = $columnType;
-					}
-				}
-			}
-
-			/** @var bool */
-			return $columnNameTypePair === $comparison;
-		}
-
-
-
-
-
-		// Instance Row Methods.
-		// -----------------------------------------------------------------------------------------------------------------------------
-
-		// Checks if a row exists in the table using its slug value. Returns true if the row exists, false otherwise.
-		public function row_isset( string $rowSlug ) : bool {
-
-			self::error_if_empty_sqlite_slug( $rowSlug );
-
-			$bindings = array( ['colName' => '_slug', 'paramName' => ':slug', 'paramValue' => $rowSlug] );
-
-			$sql = <<<SQL
-				SELECT 1 FROM `{$this->tblnam}` WHERE _slug = :slug LIMIT 1;
-			SQL;
-
-			$fnResult = false;
-
-			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
-
-				if( $result->fetchArray( SQLITE3_ASSOC ) !== false ) {
-
-					$fnResult = true;
-				}
-			});
-
-			/** @var bool */
-			return $fnResult;
-		}
-
-
-		// Inserts a new row or updates an existing row based on the slug value. All values are safely bound using prepared statements with correct type mapping.
-		// Returns true if the query executed successfully (row inserted or updated), or false on query error.
-		public function row_upsert( string $rowSlug, array $columnNameValuePair ) : bool {
-
-			self::error_if_empty_sqlite_slug( $rowSlug );
-
-			$bindIndex = 0;
-			$bindings = array();
-
-			// Build the prepare array which contains all custom columnName => columnValue pairs with their corresponding bind values and type mapping.
-			foreach( $columnNameValuePair as $columnName => $columnValue ) {
-
-				if( $this->column_exists( $columnName ) ) {
-
-					$marker = ':bind' . $bindIndex;
-					$bindIndex++;
-					$bindings[] = ['colName' => $columnName, 'paramName' => $marker, 'paramValue' => $columnValue];
-				}
-			}
-
-			self::error_if_sqlite_parameter_columns_missing( $columnNameValuePair, $bindings );
-
-			// Define default values for INSERT operations that are always added.
-			$insertDefaults = [
-				'_slug' => ':slug',
-			];
-
-			// Define default values for DO UPDATE SET operations that are always updated on conflict.
-			$upsertDefaults = [
-				'_updated_at' => 'CURRENT_TIMESTAMP',
-			];
-
-			// Extract the custom prepared columns from the prepare array for use in SQL statements.
-			$upsertCustom = array_combine( array_column( $bindings, 'colName' ), array_column( $bindings, 'paramName' ) );
-
-			// Merge all INSERT columns and values into one set for the final INSERT statement.
-			$insert_merged = array_merge( $insertDefaults, $upsertCustom );
-			$insert_into   = implode( ', ', array_keys( $insert_merged ) );
-			$insert_values = implode( ', ', array_values( $insert_merged ) );
-
-			// Merge all columns and values for the DO UPDATE SET part of the UPSERT statement.
-			$do_update_merged = array_merge( $upsertDefaults, $upsertCustom );
-			$do_update_pair   = implode( ', ', array_map( function( string $k, string $v ) : string { return $k . '=' . $v; }, array_keys( $do_update_merged ), array_values( $do_update_merged ) ) );
-
-			// Extend Execute Statement to include the Slug parameter.
-			$bindings[] = ['colName' => '_slug', 'paramName' => ':slug', 'paramValue' => $rowSlug];
-
-			$sql = <<<SQL
-				INSERT INTO `{$this->tblnam}` ({$insert_into}) VALUES ({$insert_values}) ON CONFLICT(_slug) DO UPDATE SET {$do_update_pair};
-			SQL;
-
-			$fnResult = false;
-
-			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
-
-				$fnResult = true;
-			});
-
-			/** @var bool */
-			return $fnResult;
-		}
-
-
-		// Removes a row from the table using its slug if it exists. Returns true if the query executed successfully, or false on query error.
-		public function row_remove( string $rowSlug ) : bool {
-
-			self::error_if_empty_sqlite_slug( $rowSlug );
-
-			$bindings = array( ['colName' => '_slug', 'paramName' => ':slug', 'paramValue' => $rowSlug] );
-
-			$sql = <<<SQL
-				DELETE FROM `{$this->tblnam}` WHERE _slug = :slug;
-			SQL;
-
-			$fnResult = false;
-
-			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
-
-				$fnResult = true;
-			});
-
-			/** @var bool */
-			return $fnResult;
-		}
-
-
-
-
-
-		// Instance Database Select Methods.
-		// -----------------------------------------------------------------------------------------------------------------------------
-
-		// Select specific records based on the provided arguments array.
-		public function select( array $args ) : array {
-
-			// Builder function for DISTINCT.
-			$buildDistinct = function() use ( $args ) : string {
-
-				/** @var string */
-				return isset( $args['distinct'] ) && $args['distinct'] === true ? 'DISTINCT' : '';
-			};
-
-			// Builder function for COLUMNS.
-			$buildColumns = function() use ( $args ) : string {
-
-				$temp = [];
-
-				if( isset( $args['columns'] ) && is_array( $args['columns'] ) ) {
-
-					foreach( $args['columns'] as $columnName ) {
-
-						self::error_if_invalid_sqlite_name( $columnName );
-
-						$temp[] = $columnName;
-					}
-				}
-
-				/** @var string */
-				return !empty( $temp ) ? implode( ', ', $temp ) : '*';
-			};
-
-			// Builder function for WHERE.
-			$bindIndex = 0;
-			$bindings = array();
-			$buildWhere = function() use ( $args, &$bindIndex, &$bindings ) : string {
-
-				$helperWhereRecursive = function( array $node ) use ( &$helperWhereRecursive, &$bindIndex, &$bindings ) : string {
-
-					// 1. LOGICAL CONTAINERS: AND / OR
-					if( isset( $node['AND'] ) && is_array( $node['AND'] ) ) {
-
-						return '(' . implode(' AND ', array_filter( array_map( $helperWhereRecursive, $node['AND'] ) ) ) . ')';
-					}
-
-					else if( isset( $node['OR'] ) && is_array( $node['OR'] ) ) {
-
-						return '(' . implode(' OR ', array_filter( array_map( $helperWhereRecursive, $node['OR'] ) ) ) . ')';
-					}
-
-					// 2. NOT (Unary, rekursiv)
-					else if( isset( $node['NOT'] ) && is_array( $node['NOT'] ) ) {
-
-						return 'NOT (' . $helperWhereRecursive( $node['NOT'] ) . ')';
-					}
-
-					// 3. LEAF-NODES: einfache Bedingungen
-					else if( isset( $node['column'] ) && isset( $node['op'] ) ) {
-
-						self::error_if_invalid_sqlite_name( $node['column'] );
-
-						if( $node['op'] === 'IS NULL' ) {
-
-							return $node['column'] . ' IS NULL';
-						}
-
-						else if( $node['op'] === 'EXISTS' ) {
-							// TODO
-						}
-
-						else if( $node['op'] === 'IN' ) {
-							// TODO
-						}
-
-						else if( $node['op'] === 'BETWEEN' ) {
-							// TODO
-						}
-
-						else if( in_array( $node['op'], array( '=', '!=', '<', '<=', '>', '>=', 'LIKE' ) ) && isset( $node['value'] ) ) {
-
-							$marker = ':bind' . $bindIndex;
-							$bindIndex++;
-							$bindings[] = ['colName' => $node['column'], 'paramName' => $marker, 'paramValue' => $node['value']];
-
-							return $node['column'] . ' ' . $node['op'] . ' ' . $marker;
-						}
-						else {
-
-							// ERROR
-						}
-					}
-					else {
-
-						// ERROR
-					}
-
-					return '';
-				};
-
-
-				/** @var string */
-				return isset( $args['where'] ) && is_array( $args['where'] ) ? 'WHERE ' . $helperWhereRecursive( $args['where'] ) : '';
-			};
-
-			// Builder function for ORDER BY.
-			$buildOrderBy = function() use ( $args ) : string {
-
-				$temp = [];
-
-				if( isset( $args['orderby'] ) && is_array( $args['orderby'] ) ) {
-
-					foreach( $args['orderby'] as $columnName => $sort ) {
-
-						self::error_if_invalid_sqlite_name( $columnName );
-
-						$temp[] = $columnName . ' ' . ( $sort === 'DESC' ? 'DESC' : 'ASC' );
-					}
-				}
-
-				/** @var string */
-				return !empty( $temp ) ? 'ORDER BY ' . implode( ', ', $temp ) : '';
-			};
-
-			// Builder function for LIMIT.
-			$buildLimit = function() use ( $args ) : string {
-
-				/** @var string */
-				return isset( $args['limit'] ) && is_int( $args['limit'] ) ? 'LIMIT ' . max( 0, $args['limit'] ) : '';
-			};
-
-			// Builder function for OFFSET.
-			$buildOffset = function() use ( $args ) : string {
-
-				/** @var string */
-				return isset( $args['offset'] ) && is_int( $args['offset'] ) ? 'OFFSET ' . max( 0, $args['offset'] ) : '';
-			};
-
-			$sql = <<<SQL
-				SELECT {$buildDistinct()} {$buildColumns()} FROM `{$this->tblnam}` {$buildWhere()} {$buildOrderBy()} {$buildLimit()} {$buildOffset()};
-			SQL;
-
-			$fnResult = [];
-
-			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
-
-				while( ( $found = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
-
-					$fnResult[] = $found;
-				}
-			});
-
-			/** @var array */
-			return $fnResult;
-		}
-
-
-
-
-
-		// Instance Helper Methods.
-		// -----------------------------------------------------------------------------------------------------------------------------
-
-		// Executes a prepared SQLite statement. The method expects an SQL string with placeholders (e.g. :bind0, :slug) as well as an array of bind data containing colName, paramName, and paramValue.
-		// The SQLite3 affinity type is mapped based on the declared column type of the table. The statement is only executed if all bindings have been successfully set.
+		// Executes a prepared SQLite3 statement. The method accepts an SQL string with named placeholders as well as an associative array of parameter names mapped to values.
+		// Since columns are not strictly typed (using flexible storage types), the actual SQLite3 affinity is derived from the PHP data type.
+		// The following PHP data types are possible: null, string, float, int, resource.
+		// The callback is executed only if all bindings were successfully applied.
 		private function consume_query( string $sql, array $bindings, callable $callback ) : void {
 
-			// Prepare the SQL statement.
+			// Prepare the SQLite3 statement.
 			if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
 
 				$comparison = [];
 
-				// Retrieves table information and defines a mapping array from declared column types to SQLite3 affinity constants.
-				$tableinfo   = $this->table_info_columns();
-				$affinitymap = array( 'INTEGER' => SQLITE3_INTEGER, 'REAL' => SQLITE3_FLOAT, 'BLOB' => SQLITE3_BLOB );
+				foreach( $bindings as $paramName => $paramValue ) {
 
-				foreach( $bindings as $key => $binding ) {
+					if( is_string( $paramName ) ) {
 
-					// Skip invalid bind data entries that are missing required keys.
-					if( array_key_exists( 'colName', $binding ) && array_key_exists( 'paramName', $binding ) && array_key_exists( 'paramValue', $binding ) ) {
+						// paramName:  string
+						// paramValue: mixed  (null, string, float, int, resource)
+						$validType = false;
 
-						$colName    = $binding['colName'];    // String
-						$paramName  = $binding['paramName'];  // String
-						$paramValue = $binding['paramValue']; // Mixed
+						if( is_null( $paramValue ) ) {
 
-						// Performs the mapping using the mapping array. The SQLite3 affinity type is matched against the already declared column type of the table.
-						// Possible types are INTEGER, REAL, BLOB, and TEXT. Additionally, NULL has a special role and is always treated as SQLITE3_NULL, regardless of the declared column type.
-						// The conversion of values from the variables is handled by SQLite3.
-						$affinitytype = ( $paramValue === null ) ? SQLITE3_NULL : ( ( isset( $tableinfo[$colName] ) && isset( $affinitymap[$tableinfo[$colName]] ) ) ? $affinitymap[$tableinfo[$colName]] : SQLITE3_TEXT );
+							$paramType = SQLITE3_NULL;
+							$validType = true;
+						}
+						else if( is_string( $paramValue ) ) {
 
-						// Bind value to the prepared statement.
-						if( ( $stmt->bindValue( $paramName, $paramValue, $affinitytype ) ) !== false ) {
+							$paramType = SQLITE3_TEXT;
+							$validType = true;
+						}
+						else if( is_float( $paramValue ) ) {
 
-							$comparison[$key] = $binding;
+							$paramType = SQLITE3_FLOAT;
+							$validType = true;
+						}
+						else if( is_int( $paramValue ) ) {
+
+							$paramType = SQLITE3_INTEGER;
+							$validType = true;
+						}
+						else if( is_resource( $paramValue ) ) {
+
+							if( ( $paramValue = stream_get_contents( $paramValue ) ) !== false ) {
+
+								$paramType = SQLITE3_BLOB;
+								$validType = true;
+							}
+						}
+
+						// If the affinity type has been correctly mapped, the value is bound to the prepared statement.
+						if( $validType ) {
+
+							if( ( $stmt->bindValue( $paramName, $paramValue, $paramType ) ) !== false ) {
+
+								$comparison[] = $paramName;
+							}
 						}
 					}
 				}
 
-				if( $bindings === $comparison ) {
+				// Execute the statement only if all values were bound successfully.
+				if( array_keys( $bindings ) === $comparison ) {
 
-					// Execute the statement only if all values were bound successfully.
 					if( ( $result = $stmt->execute() ) !== false ) {
 
 						try {
@@ -566,9 +143,670 @@
 				}
 			}
 		}
-
-
 	}
+
+
+
+
+
+	// Shared error handling and validation helpers.
+	// -----------------------------------------------------------------------------------------------------------------------------
+
+	trait ToolkitSQLite3_methods_errors {
+
+
+		// Error handler: validates a SQLite3 identifier (table or column name). Ensures the name matches format and length constraints.
+		private static function error_if_invalid_sqlite_name( string $name ) : void {
+
+			if( strlen( $name ) > static::$maxlength || preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
+
+				throw new InvalidArgumentException( 'ERROR: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::$maxlength . ' characters long.' );
+			}
+		}
+
+
+
+		// Error handler: ensures that the SQLite3 row slug is not empty.
+		private static function error_if_empty_sqlite_slug( string $slug ) : void {
+
+			if( strlen( $slug ) === 0 ) {
+
+				throw new InvalidArgumentException( 'ERROR: The row slug in SQLite3 must not be empty.' );
+			}
+		}
+
+
+
+		// Error handler: ensures that the generated WHERE clause contains at least one valid predicate expression.
+		private static function error_if_where_all_predicate_empty( string $where ) : void {
+
+			if( empty( $where ) ) {
+
+				throw new InvalidArgumentException( 'ERROR: Failed to generate the SQLite3 WHERE clause. No valid predicate expression could be resolved from the provided WHERE definition.' );
+			}
+		}
+	}
+
+
+
+
+
+	// Instance Table-level operations for SQLite3 tables.
+	// -----------------------------------------------------------------------------------------------------------------------------
+
+	trait ToolkitSQLite3_methods_table {
+
+
+		// Checks whether the table exists in the database.
+		// Returns true if the table exists, otherwise false.
+		public function table_exists() : bool {
+
+			$bindings = [':table' => $this->tblnam];
+
+			$sql = <<<SQL
+				SELECT 1 FROM sqlite_master WHERE type='table' AND name=:table LIMIT 1;
+			SQL;
+
+			$fnResult = false;
+
+			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
+
+				$fnResult = $result->fetchArray( SQLITE3_NUM ) !== false;
+			});
+
+			/** @var bool */
+			return $fnResult;
+		}
+
+
+
+		// Creates the table if it does not exist.
+		// Returns true if the query was executed successfully (it can be assumed that the table exists afterwards), otherwise false on query error.
+		public function table_add_ignore() : bool {
+
+			$sql = <<<SQL
+				CREATE TABLE IF NOT EXISTS "{$this->tblnam}" (
+					_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					_slug TEXT NOT NULL UNIQUE,
+					_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+				) STRICT;
+			SQL;
+
+			/** @var bool */
+			return $this->sqlite->exec( $sql ) !== false;
+		}
+
+
+
+		// Drops the table if it exists.
+		// Returns true if the query was executed successfully (it can be assumed that the table does not exist afterwards), otherwise false on query error.
+		public function table_delete_ignore() : bool {
+
+			$sql = <<<SQL
+				DROP TABLE IF EXISTS "{$this->tblnam}";
+			SQL;
+
+			/** @var bool */
+			return $this->sqlite->exec( $sql ) !== false;
+		}
+	}
+
+
+
+
+
+	// Instance Column-level operations for SQLite3 tables.
+	// -----------------------------------------------------------------------------------------------------------------------------
+
+	trait ToolkitSQLite3_methods_column {
+
+
+		// Checks whether a column exists in the current table.
+		// Returns true if the column exists, otherwise false.
+		public function column_exists( string $columnName ) : bool {
+
+			self::error_if_invalid_sqlite_name( $columnName );
+
+			$bindings = [':column' => $columnName];
+
+			$sql = <<<SQL
+				SELECT 1 FROM pragma_table_info("$this->tblnam") WHERE name=:column LIMIT 1;
+			SQL;
+
+			$fnResult = false;
+
+			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
+
+				$fnResult = $result->fetchArray( SQLITE3_NUM ) !== false;
+			});
+
+			/** @var bool */
+			return $fnResult;
+		}
+
+
+
+		// Adds columns to the table if they do not already exist.
+		// Returns true if the query was executed successfully (it can be assumed that the columns were processed afterwards), otherwise false on query error.
+		public function columns_add_ignore( string ...$columnNames ) : bool {
+
+			$sql = '';
+
+			foreach( $columnNames as $columnName ) {
+
+				if( !$this->column_exists( $columnName ) ) {
+
+					$sql .= <<<SQL
+						ALTER TABLE "{$this->tblnam}" ADD COLUMN "{$columnName}" ANY;
+					SQL;
+				}
+			}
+
+			/** @var bool */
+			return empty( $sql ) ? true : ( $this->sqlite->exec( $sql ) !== false );
+		}
+
+
+
+		// Removes columns from the table if they exist.
+		// Returns true if the query was executed successfully (it can be assumed that the columns were processed afterwards), otherwise false on query error.
+		public function columns_delete_ignore( string ...$columnNames ) : bool {
+
+			$sql = '';
+
+			foreach( $columnNames as $columnName ) {
+
+				if( $this->column_exists( $columnName ) ) {
+
+					$sql .= <<<SQL
+						ALTER TABLE "{$this->tblnam}" DROP COLUMN "{$columnName}";
+					SQL;
+				}
+			}
+
+			/** @var bool */
+			return empty( $sql ) ? true : ( $this->sqlite->exec( $sql ) !== false );
+		}
+	}
+
+
+
+
+
+	// Instance Row-level operations for SQLite3 tables.
+	// -----------------------------------------------------------------------------------------------------------------------------
+
+	trait ToolkitSQLite3_methods_row {
+
+
+		// Checks if a row exists in the table using its slug value.
+		// Returns true if the row exists, otherwise false.
+		public function row_isset( string $rowSlug ) : bool {
+
+			self::error_if_empty_sqlite_slug( $rowSlug );
+
+			$bindings = [':slug' => $rowSlug];
+
+			$sql = <<<SQL
+				SELECT 1 FROM "{$this->tblnam}" WHERE _slug=:slug LIMIT 1;
+			SQL;
+
+			$fnResult = false;
+
+			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
+
+				$fnResult = $result->fetchArray( SQLITE3_NUM ) !== false;
+			});
+
+			/** @var bool */
+			return $fnResult;
+		}
+
+
+
+		// Inserts a new row or updates an existing row based on the slug value.
+		// All values are safely bound using prepared statements and column names are validated at runtime.
+		// Returns true if the query executed successfully (insert or update), false on query error.
+		public function row_upsert( string $rowSlug, array $columnNameValuePair ) : bool {
+
+			self::error_if_empty_sqlite_slug( $rowSlug );
+
+			$columns  = ['_slug'];
+			$params   = [':slug'];
+			$clauses  = ['_updated_at=CURRENT_TIMESTAMP'];
+			$bindings = [':slug' => $rowSlug];
+
+			foreach( $columnNameValuePair as $columnName => $columnValue ) {
+
+				self::error_if_invalid_sqlite_name( $columnName );
+
+				$token = $this->get_unique_token();
+
+				$columns[]        = $columnName;
+				$params[]         = $token;
+				$clauses[]        = $columnName . '=' . $token;
+				$bindings[$token] = $columnValue;
+			}
+
+			$columns = implode( ', ', $columns );
+			$params  = implode( ', ', $params );
+			$clauses = implode( ', ', $clauses );
+
+			$sql = <<<SQL
+				INSERT INTO "{$this->tblnam}" ({$columns}) VALUES ({$params}) ON CONFLICT(_slug) DO UPDATE SET {$clauses};
+			SQL;
+
+			$fnResult = false;
+
+			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
+
+				$fnResult = true;
+			});
+
+			/** @var bool */
+			return $fnResult;
+		}
+
+
+
+		// Removes a row from the table using its slug value.
+		// Returns true if a row was deleted, or false if no matching row existed or the deletion failed.
+		public function row_remove( string $rowSlug ) : bool {
+
+			self::error_if_empty_sqlite_slug( $rowSlug );
+
+			$bindings = [':slug' => $rowSlug];
+
+			$sql = <<<SQL
+				DELETE FROM "{$this->tblnam}" WHERE _slug=:slug;
+			SQL;
+
+			$fnResult = false;
+
+			$this->consume_query( $sql, $bindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
+
+				$fnResult = ( $this->sqlite->changes() > 0 );
+			});
+
+			/** @var bool */
+			return $fnResult;
+		}
+	}
+
+
+
+
+
+	// Instance methods for selecting and filtering database entries.
+	// -----------------------------------------------------------------------------------------------------------------------------
+
+	trait ToolkitSQLite3_methods_select {
+
+
+		// Builds the SELECT query and executes it using a prepared statement.
+		// Two internal helper properties are used within this method and its helpers to manage query state.
+		private array $selectReserved;
+		private array $selectBindings;
+
+		public function select( array $args ) : array {
+
+			$this->selectReserved = ['_id', '_slug', '_created_at', '_updated_at']; // Built-in column names excluded from validation.
+			$this->selectBindings = [];
+
+			$buildDistinct = $this->select_buildDistinct( $args );
+			$buildList     = $this->select_buildList( $args );
+			$buildWhere    = $this->select_buildWhere( $args );
+			$buildOrderBy  = $this->select_buildOrderBy( $args );
+			$buildLimit    = $this->select_buildLimit( $args );
+			$buildOffset   = $this->select_buildOffset( $args );
+
+			$sql = <<<SQL
+				SELECT {$buildDistinct} {$buildList} FROM "{$this->tblnam}" {$buildWhere} {$buildOrderBy} {$buildLimit} {$buildOffset};
+			SQL;
+
+			$fnResult = [];
+
+			$this->consume_query( $sql, $this->selectBindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
+
+				$len = strlen( static::$typealias );
+
+				while( ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
+
+					$record = [];
+
+					foreach( $row as $columnName => $columnValue ) {
+
+						$attributeKey = 'value';
+
+						if( str_starts_with( $columnName, static::$typealias ) ) {
+
+							$attributeKey = 'type';
+							$columnName   = substr( $columnName, $len );
+						}
+
+						$record[$columnName][$attributeKey] = $columnValue;
+					}
+
+					$fnResult[] = $record;
+				}
+			});
+
+			/** @var array */
+			return $fnResult;
+		}
+	}
+
+
+
+
+
+	// Helper methods exclusively used within the select() method for building simple SELECT query clauses (non-complex components of a SELECT statement).
+	// -----------------------------------------------------------------------------------------------------------------------------
+
+	trait ToolkitSQLite3_methods_select__parts {
+
+
+		// Helper to build the DISTINCT keyword for the SELECT statement.
+		// Removes duplicate rows from the result set.
+		// Example usage: $db->select([ 'distinct' => true ])
+		private function select_buildDistinct( array $args ) : string {
+
+			/** @var string */
+			return !empty( $args['distinct'] ) ? 'DISTINCT' : '';
+		}
+
+
+
+		// Helper to build the SELECT list for the SELECT statement.
+		// Returns all table columns if no column list is provided, otherwise only the specified columns.
+		// Generates a SELECT list that includes each column and its SQLite3 runtime type using typeof().
+		// Example usage: $db->select([ 'columns' => array( 'col1', 'col2' ) ])
+		private function select_buildList( array $args ) : string {
+
+			$columnParts = [];
+			$columnNames = ( isset( $args['columns'] ) && is_array( $args['columns'] ) ) ? $args['columns'] : [];
+
+			if( empty( $columnNames ) ) {
+
+				$sql = <<<SQL
+					PRAGMA table_info("{$this->tblnam}");
+				SQL;
+
+				if( ( $result = $this->sqlite->query( $sql ) ) !== false ) {
+
+					while( ( $col = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
+
+						if( isset( $col['name'] ) ) {
+
+							$columnNames[] = $col['name'];
+						}
+					}
+
+					$result->finalize();
+				}
+			}
+
+			foreach( $columnNames as $columnName ) {
+
+				if( !in_array( $columnName, $this->selectReserved, true ) ) {
+
+					self::error_if_invalid_sqlite_name( $columnName );
+				}
+
+				$columnParts[] = $columnName;
+				$columnParts[] = 'typeof(' . $columnName . ') AS ' . static::$typealias . $columnName;
+			}
+
+			/** @var string */
+			return implode( ', ', $columnParts );
+		}
+
+
+
+		// Helper to build the ORDER BY list for the SELECT statement.
+		// Defines the result ordering based on one or more columns with ASC or DESC direction.
+		// Example usage: $db->select([ 'orderby' => array( 'col1' => 'desc' ) ])
+		private function select_buildOrderBy( array $args ) : string {
+
+			$sortParts = [];
+			$sortRules = ( isset( $args['orderby'] ) && is_array( $args['orderby'] ) ) ? $args['orderby'] : [];
+
+			foreach( $sortRules as $columnName => $direction ) {
+
+				if( !in_array( $columnName, $this->selectReserved, true ) ) {
+
+					self::error_if_invalid_sqlite_name( $columnName );
+				}
+
+				$sortParts[] = $columnName . ' ' . ( strtoupper( strval( $direction ) ) === 'DESC' ? 'DESC' : 'ASC' );
+			}
+
+			/** @var string */
+			return ( !empty( $sortParts ) ? 'ORDER BY ' . implode( ', ', $sortParts ) : '' );
+		}
+
+
+
+		// Helper to build the LIMIT clause for the SELECT statement.
+		// Restricts the maximum number of rows returned by the query.
+		// Example usage: $db->select([ 'limit' => 10 ])
+		private function select_buildLimit( array $args ) : string {
+
+			/** @var string */
+			return ( isset( $args['limit'] ) && is_int( $args['limit'] ) ) ? 'LIMIT ' . max( 0, $args['limit'] ) : '';
+		}
+
+
+
+		// Helper to build the OFFSET clause for the SELECT statement.
+		// Defines the number of rows to skip before returning results.
+		// Example usage: $db->select([ 'offset' => 10 ])
+		private function select_buildOffset( array $args ) : string {
+
+			/** @var string */
+			return ( isset( $args['offset'] ) && is_int( $args['offset'] ) ) ? 'OFFSET ' . max( 0, $args['offset'] ) : '';
+		}
+	}
+
+
+
+
+
+	// Helper methods exclusively used within the select() method for building complex WHERE expressions (logical trees and filter conditions).
+	// -----------------------------------------------------------------------------------------------------------------------------
+
+	trait ToolkitSQLite3_methods_select__where {
+
+
+		// Helper to build the WHERE clause for the SELECT statement.
+		// Entry point for building the WHERE clause from a structured condition tree.
+		// The expression tree is evaluated by a Logical Tree Node Renderer (for logical structure such as AND/OR/NOT) and a Leaf Node Renderer (for atomic comparisons such as column operators and value checks).
+		// Due to this hierarchical complexity, the evaluation logic is separated into dedicated helper methods.
+		// Example usage: $db->select([ 'where' => array( ... ) ])
+		private function select_buildWhere( array $args ) : string {
+
+			$fnResult = '';
+
+			if( isset( $args['where'] ) && is_array( $args['where'] ) ) {
+
+				if( !empty( $result = $this->select_buildWhere__renderTreeNode( $args['where'] ) ) ) {
+
+					$fnResult = 'WHERE ' . $result;
+				}
+			}
+
+			/** @var string */
+			return $fnResult;
+		}
+
+
+
+		// Helper for the WHERE clause Builder - Logical Tree Node Renderer.
+		// Processes a hierarchical expression tree of logical operators (AND / OR as n-ary operators, NOT as unary operator).
+		// Leaf nodes are delegated to the Leaf Node Renderer for atomic condition evaluation.
+		private function select_buildWhere__renderTreeNode( array $node ) : string {
+
+			$fnResult = '';
+
+			if( array_key_exists( 'AND', $node ) && is_array( $node['AND'] ) ) {
+
+				$fnResult = '(' . implode( ' AND ', array_filter( array_map( [$this, 'select_buildWhere__renderTreeNode'], $node['AND'] ) ) ) . ')';
+			}
+			else if( array_key_exists( 'OR', $node ) && is_array( $node['OR'] ) ) {
+
+				$fnResult = '(' . implode( ' OR ', array_filter( array_map( [$this, 'select_buildWhere__renderTreeNode'], $node['OR'] ) ) ) . ')';
+			}
+			else if( array_key_exists( 'NOT', $node ) && is_array( $node['NOT'] ) ) {
+
+				$fnResult = 'NOT (' . $this->select_buildWhere__renderTreeNode( $node['NOT'] ) . ')';
+			}
+			else {
+
+				$fnResult = $this->select_buildWhere__renderLeafNode( $node );
+			}
+
+			/** @var string */
+			return $fnResult;
+		}
+
+
+
+		// Helper for the WHERE clause Builder - Leaf Node Renderer.
+		// Processes atomic WHERE expressions representing a single column-based condition.
+		// Each leaf node defines a basic predicate consisting of a column identifier, an operator, and the associated operand(s).
+		private function select_buildWhere__renderLeafNode( array $node ) : string {
+
+			$fnResult = '';
+
+			// Structural validation: all leaf nodes require a column identifier and an operator.
+			if( isset( $node['column'], $node['op'] ) && is_string( $node['column'] ) && is_string( $node['op'] ) ) {
+
+				if( !in_array( $node['column'], $this->selectReserved, true ) ) {
+
+					self::error_if_invalid_sqlite_name( $node['column'] );
+				}
+
+				// Register all specialized leaf predicate renderers.
+				// The renderers are evaluated sequentially until the first non-empty SQL fragment is returned.
+				$predicates = array(
+					'select_buildWhere__renderLeafNode__binaryPredicate',
+					'select_buildWhere__renderLeafNode__membershipPredicate',
+					'select_buildWhere__renderLeafNode__rangePredicate',
+					'select_buildWhere__renderLeafNode__nullPredicate',
+				);
+
+				foreach( $predicates as $predicate ) {
+
+					if( !empty( $result = $this->$predicate( $node ) ) ) {
+
+						$fnResult = $result;
+						break;
+					}
+				}
+			}
+
+			self::error_if_where_all_predicate_empty( $fnResult );
+
+			/** @var string */
+			return $fnResult;
+		}
+
+
+
+		// Helper for the WHERE clause Builder - Leaf Node Renderer - Binary predicate - SQL: <column> OP <value>.
+		// Example usage: $db->select([ 'where' => array( 'column' => 'col1', 'op' => '=', 'value' => 'val1' ) ])
+		private function select_buildWhere__renderLeafNode__binaryPredicate( array $node ) : string {
+
+			$fnResult = '';
+
+			if( in_array( $node['op'], ['=', '!=', '<', '<=', '>', '>=', 'LIKE', 'GLOB'], true ) && isset( $node['value'] ) ) {
+
+				$token = $this->get_unique_token();
+				$this->selectBindings[$token] = $node['value'];
+
+				$fnResult = $node['column'] . ' ' . $node['op'] . ' ' . $token;
+			}
+
+			/** @var string */
+			return $fnResult;
+		}
+
+
+
+		// Helper for the WHERE clause Builder - Leaf Node Renderer - Membership predicate - SQL: <column> IN (<value list>).
+		// Example usage: $db->select([ 'where' => array( 'column' => 'col1', 'op' => 'IN', 'values' => array( 'val1', 'val2' ) ) ])
+		private function select_buildWhere__renderLeafNode__membershipPredicate( array $node ) : string {
+
+			$fnResult = '';
+
+			if( $node['op'] === 'IN' && isset( $node['values'] ) && is_array( $node['values'] ) ) {
+
+				$in = [];
+
+				foreach( $node['values'] as $value ) {
+
+					$token = $this->get_unique_token();
+					$this->selectBindings[$token] = $value;
+					$in[] = $token;
+				}
+
+				if( !empty( $in ) ) {
+
+					$fnResult = $node['column'] . ' IN (' . implode( ', ', $in ) . ')';
+				}
+			}
+
+			/** @var string */
+			return $fnResult;
+		}
+
+
+
+		// Helper for the WHERE clause Builder - Leaf Node Renderer - Range predicate - SQL: <column> BETWEEN <min> AND <max>.
+		// Example usage: $db->select([ 'where' => array( 'column' => 'col1', 'op' => 'BETWEEN', 'min' => 10, 'max' => 20 ) ])
+		private function select_buildWhere__renderLeafNode__rangePredicate( array $node ) : string {
+
+			$fnResult = '';
+
+			if( $node['op'] === 'BETWEEN' && isset( $node['min'], $node['max'] ) && is_scalar( $node['min'] ) && is_scalar( $node['max'] ) ) {
+
+				$min = $this->get_unique_token();
+				$this->selectBindings[$min] = $node['min'];
+
+				$max = $this->get_unique_token();
+				$this->selectBindings[$max] = $node['max'];
+
+				$fnResult = $node['column'] . ' BETWEEN ' . $min . ' AND ' . $max;
+			}
+
+			/** @var string */
+			return $fnResult;
+		}
+
+
+
+		// Helper for the WHERE clause Builder - Leaf Node Renderer - Null predicate - SQL: <column> IS NULL.
+		// Example usage: $db->select([ 'where' => array( 'column' => 'col1', 'op' => 'IS NULL' ) ])
+		private function select_buildWhere__renderLeafNode__nullPredicate( array $node ) : string {
+
+			$fnResult = '';
+
+			if( $node['op'] === 'IS NULL' ) {
+
+				$fnResult = $node['column'] . ' IS NULL';
+			}
+
+			/** @var string */
+			return $fnResult;
+		}
+	}
+
+
+	// TODO: Review README.md documentation.
+	// TODO: Check for possible race conditions.
+	// TODO: Review and refine code comments.
+	// TODO: Consider extracting runtime type reconversion into a dedicated trait.
 
 
 ?>

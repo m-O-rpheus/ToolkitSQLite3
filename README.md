@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 0.98
+### Version 0.99
 
 ---
 
@@ -471,8 +471,12 @@ ToolkitSQLite3-main
 
 ---
 
+#### Version 0.99 Changelog:
+- Code Quality.
+- Finalized return of the selected method.
+
 #### Version 0.98 Changelog:
-- Complete overhaul of the code
+- Complete overhaul of the code.
 
 #### Version 0.97 Changelog:
 - Code Quality.

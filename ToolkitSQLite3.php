@@ -18,6 +18,7 @@
 	class ToolkitSQLite3 {
 
 
+		use ToolkitSQLite3_methods_convert;
 		use ToolkitSQLite3_methods_errors;
 		use ToolkitSQLite3_methods_table;
 		use ToolkitSQLite3_methods_column;
@@ -107,14 +108,13 @@
 						}
 						else if( is_resource( $paramValue ) ) {
 
-							if( ( $paramValue = stream_get_contents( $paramValue ) ) !== false ) {
+							if( ( $paramValue = self::resource2string( $paramValue ) ) !== false ) {
 
 								$paramType = SQLITE3_BLOB;
 								$validType = true;
 							}
 						}
 
-						// If the affinity type has been correctly mapped, the value is bound to the prepared statement.
 						if( $validType ) {
 
 							if( ( $stmt->bindValue( $paramName, $paramValue, $paramType ) ) !== false ) {
@@ -142,6 +142,59 @@
 					}
 				}
 			}
+		}
+	}
+
+
+
+
+
+	// Conversion helpers between PHP strings and stream resources.
+	// -----------------------------------------------------------------------------------------------------------------------------
+
+	trait ToolkitSQLite3_methods_convert {
+
+
+		// Convert resource to string helper.
+		final public static function resource2string( mixed $data ) : mixed {
+
+			$fnResult = false;
+
+			if( is_resource( $data ) ) {
+
+				rewind( $data );
+
+				if( ( $data = stream_get_contents( $data ) ) !== false ) {
+
+					$fnResult = $data;
+				}
+			}
+
+			/** @var string|false */
+			return $fnResult;
+		}
+
+
+
+		// Convert string to resource helper.
+		final public static function string2resource( mixed $data ) : mixed {
+
+			$fnResult = false;
+
+			if( is_string( $data ) ) {
+
+				if( ( $stream = fopen( 'php://temp', 'r+' ) ) !== false ) {
+
+					if( fwrite( $stream, $data ) !== false ) {
+
+						rewind( $stream );
+						$fnResult = $stream;
+					}
+				}
+			}
+
+			/** @var resource|false */
+			return $fnResult;
 		}
 	}
 
@@ -203,9 +256,9 @@
 
 			$bindings = [':table' => $this->tblnam];
 
-			$sql = <<<SQL
+			$sql = trim(<<<SQL
 				SELECT 1 FROM sqlite_master WHERE type='table' AND name=:table LIMIT 1;
-			SQL;
+			SQL);
 
 			$fnResult = false;
 
@@ -224,14 +277,14 @@
 		// Returns true if the query was executed successfully (it can be assumed that the table exists afterwards), otherwise false on query error.
 		public function table_add_ignore() : bool {
 
-			$sql = <<<SQL
+			$sql = trim(<<<SQL
 				CREATE TABLE IF NOT EXISTS "{$this->tblnam}" (
 					_id INTEGER PRIMARY KEY AUTOINCREMENT,
 					_slug TEXT NOT NULL UNIQUE,
 					_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 					_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 				) STRICT;
-			SQL;
+			SQL);
 
 			/** @var bool */
 			return $this->sqlite->exec( $sql ) !== false;
@@ -243,9 +296,9 @@
 		// Returns true if the query was executed successfully (it can be assumed that the table does not exist afterwards), otherwise false on query error.
 		public function table_delete_ignore() : bool {
 
-			$sql = <<<SQL
+			$sql = trim(<<<SQL
 				DROP TABLE IF EXISTS "{$this->tblnam}";
-			SQL;
+			SQL);
 
 			/** @var bool */
 			return $this->sqlite->exec( $sql ) !== false;
@@ -270,9 +323,9 @@
 
 			$bindings = [':column' => $columnName];
 
-			$sql = <<<SQL
+			$sql = trim(<<<SQL
 				SELECT 1 FROM pragma_table_info("$this->tblnam") WHERE name=:column LIMIT 1;
-			SQL;
+			SQL);
 
 			$fnResult = false;
 
@@ -297,9 +350,9 @@
 
 				if( !$this->column_exists( $columnName ) ) {
 
-					$sql .= <<<SQL
+					$sql .= trim(<<<SQL
 						ALTER TABLE "{$this->tblnam}" ADD COLUMN "{$columnName}" ANY;
-					SQL;
+					SQL);
 				}
 			}
 
@@ -319,9 +372,9 @@
 
 				if( $this->column_exists( $columnName ) ) {
 
-					$sql .= <<<SQL
+					$sql .= trim(<<<SQL
 						ALTER TABLE "{$this->tblnam}" DROP COLUMN "{$columnName}";
-					SQL;
+					SQL);
 				}
 			}
 
@@ -348,9 +401,9 @@
 
 			$bindings = [':slug' => $rowSlug];
 
-			$sql = <<<SQL
+			$sql = trim(<<<SQL
 				SELECT 1 FROM "{$this->tblnam}" WHERE _slug=:slug LIMIT 1;
-			SQL;
+			SQL);
 
 			$fnResult = false;
 
@@ -393,9 +446,9 @@
 			$params  = implode( ', ', $params );
 			$clauses = implode( ', ', $clauses );
 
-			$sql = <<<SQL
+			$sql = trim(<<<SQL
 				INSERT INTO "{$this->tblnam}" ({$columns}) VALUES ({$params}) ON CONFLICT(_slug) DO UPDATE SET {$clauses};
-			SQL;
+			SQL);
 
 			$fnResult = false;
 
@@ -418,9 +471,9 @@
 
 			$bindings = [':slug' => $rowSlug];
 
-			$sql = <<<SQL
+			$sql = trim(<<<SQL
 				DELETE FROM "{$this->tblnam}" WHERE _slug=:slug;
-			SQL;
+			SQL);
 
 			$fnResult = false;
 
@@ -461,9 +514,9 @@
 			$buildLimit    = $this->select_buildLimit( $args );
 			$buildOffset   = $this->select_buildOffset( $args );
 
-			$sql = <<<SQL
+			$sql = trim(<<<SQL
 				SELECT {$buildDistinct} {$buildList} FROM "{$this->tblnam}" {$buildWhere} {$buildOrderBy} {$buildLimit} {$buildOffset};
-			SQL;
+			SQL);
 
 			$fnResult = [];
 
@@ -488,7 +541,44 @@
 						$record[$columnName][$attributeKey] = $columnValue;
 					}
 
-					$fnResult[] = $record;
+					$validType = false;
+
+					foreach( $record as $columnName => $attribute ) {
+
+						if( $attribute['type'] === 'null' ) {
+
+							$record[$columnName] = null;
+							$validType           = true;
+						}
+						else if( $attribute['type'] === 'text' ) {
+
+							$record[$columnName] = strval( $attribute['value'] );
+							$validType           = true;
+						}
+						else if( $attribute['type'] === 'real' ) {
+
+							$record[$columnName] = floatval( $attribute['value'] );
+							$validType           = true;
+						}
+						else if( $attribute['type'] === 'integer' ) {
+
+							$record[$columnName] = intval( $attribute['value'] );
+							$validType           = true;
+						}
+						else if( $attribute['type'] === 'blob' ) {
+
+							if( ( $attribute['value'] = self::string2resource( $attribute['value'] ) ) !== false ) {
+
+								$record[$columnName] = $attribute['value'];
+								$validType           = true;
+							}
+						}
+					}
+
+					if( $validType ) {
+
+						$fnResult[] = $record;
+					}
 				}
 			});
 
@@ -529,9 +619,9 @@
 
 			if( empty( $columnNames ) ) {
 
-				$sql = <<<SQL
+				$sql = trim(<<<SQL
 					PRAGMA table_info("{$this->tblnam}");
-				SQL;
+				SQL);
 
 				if( ( $result = $this->sqlite->query( $sql ) ) !== false ) {
 

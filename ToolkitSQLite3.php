@@ -73,6 +73,8 @@
 		// The callback is executed only if all bindings were successfully applied.
 		private function consume_query( string $sql, array $bindings, callable $callback ) : void {
 
+			$err = true;
+
 			// Prepare the SQLite3 statement.
 			if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
 
@@ -84,43 +86,35 @@
 
 						// paramName:  string
 						// paramValue: mixed  (null, string, float, int, resource)
-						$validType = false;
-
 						if( is_null( $paramValue ) ) {
 
 							$paramType = SQLITE3_NULL;
-							$validType = true;
 						}
 						else if( is_string( $paramValue ) ) {
 
 							$paramType = SQLITE3_TEXT;
-							$validType = true;
 						}
 						else if( is_float( $paramValue ) ) {
 
 							$paramType = SQLITE3_FLOAT;
-							$validType = true;
 						}
 						else if( is_int( $paramValue ) ) {
 
 							$paramType = SQLITE3_INTEGER;
-							$validType = true;
 						}
 						else if( is_resource( $paramValue ) ) {
 
 							if( ( $paramValue = self::resource2string( $paramValue ) ) !== false ) {
 
 								$paramType = SQLITE3_BLOB;
-								$validType = true;
 							}
+							else self::error_if_invalid_type();
 						}
+						else self::error_if_invalid_type();
 
-						if( $validType ) {
+						if( ( $stmt->bindValue( $paramName, $paramValue, $paramType ) ) !== false ) {
 
-							if( ( $stmt->bindValue( $paramName, $paramValue, $paramType ) ) !== false ) {
-
-								$comparison[] = $paramName;
-							}
+							$comparison[] = $paramName;
 						}
 					}
 				}
@@ -132,6 +126,8 @@
 
 						try {
 
+							$err = false;
+
 							/** @param callable(SQLite3Result) $callback */
 							$callback( $result );
 						}
@@ -141,6 +137,11 @@
 						}
 					}
 				}
+			}
+
+			if( $err ) {
+
+				self::error_if_statement_binding_failed();
 			}
 		}
 	}
@@ -202,41 +203,45 @@
 
 
 
-	// Shared error handling and validation helpers.
+	// Centralized validation and error handling utilities.
 	// -----------------------------------------------------------------------------------------------------------------------------
 
 	trait ToolkitSQLite3_methods_errors {
 
 
-		// Error handler: validates a SQLite3 identifier (table or column name). Ensures the name matches format and length constraints.
 		private static function error_if_invalid_sqlite_name( string $name ) : void {
 
 			if( strlen( $name ) > static::$maxlength || preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
 
-				throw new InvalidArgumentException( 'ERROR: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::$maxlength . ' characters long.' );
+				throw new InvalidArgumentException( 'ToolkitSQLite3: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::$maxlength . ' characters long.' );
 			}
 		}
 
 
-
-		// Error handler: ensures that the SQLite3 row slug is not empty.
 		private static function error_if_empty_sqlite_slug( string $slug ) : void {
 
 			if( strlen( $slug ) === 0 ) {
 
-				throw new InvalidArgumentException( 'ERROR: The row slug in SQLite3 must not be empty.' );
+				throw new InvalidArgumentException( 'ToolkitSQLite3: The row slug in SQLite3 must not be empty.' );
 			}
 		}
 
 
+		private static function error_if_where_all_predicate_empty() : void {
 
-		// Error handler: ensures that the generated WHERE clause contains at least one valid predicate expression.
-		private static function error_if_where_all_predicate_empty( string $where ) : void {
+			throw new InvalidArgumentException( 'ToolkitSQLite3: Failed to generate the SQLite3 WHERE clause. No valid predicate expression could be resolved from the provided WHERE definition.' );
+		}
 
-			if( empty( $where ) ) {
 
-				throw new InvalidArgumentException( 'ERROR: Failed to generate the SQLite3 WHERE clause. No valid predicate expression could be resolved from the provided WHERE definition.' );
-			}
+		private static function error_if_invalid_type() : void {
+
+			throw new InvalidArgumentException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, resource.' );
+		}
+
+
+		private static function error_if_statement_binding_failed() : void {
+
+			throw new InvalidArgumentException( 'ToolkitSQLite3: Binding of values for the prepared statement failed due to an unexpected error.' );
 		}
 	}
 
@@ -541,44 +546,36 @@
 						$record[$columnName][$attributeKey] = $columnValue;
 					}
 
-					$validType = false;
-
 					foreach( $record as $columnName => $attribute ) {
 
 						if( $attribute['type'] === 'null' ) {
 
 							$record[$columnName] = null;
-							$validType           = true;
 						}
 						else if( $attribute['type'] === 'text' ) {
 
 							$record[$columnName] = strval( $attribute['value'] );
-							$validType           = true;
 						}
 						else if( $attribute['type'] === 'real' ) {
 
 							$record[$columnName] = floatval( $attribute['value'] );
-							$validType           = true;
 						}
 						else if( $attribute['type'] === 'integer' ) {
 
 							$record[$columnName] = intval( $attribute['value'] );
-							$validType           = true;
 						}
 						else if( $attribute['type'] === 'blob' ) {
 
 							if( ( $attribute['value'] = self::string2resource( $attribute['value'] ) ) !== false ) {
 
 								$record[$columnName] = $attribute['value'];
-								$validType           = true;
 							}
+							else self::error_if_invalid_type();
 						}
+						else self::error_if_invalid_type();
 					}
 
-					if( $validType ) {
-
-						$fnResult[] = $record;
-					}
+					$fnResult[] = $record;
 				}
 			});
 
@@ -796,7 +793,10 @@
 				}
 			}
 
-			self::error_if_where_all_predicate_empty( $fnResult );
+			if( empty( $fnResult ) ) {
+
+				self::error_if_where_all_predicate_empty();
+			}
 
 			/** @var string */
 			return $fnResult;
@@ -891,12 +891,6 @@
 			return $fnResult;
 		}
 	}
-
-
-	// TODO: Review README.md documentation.
-	// TODO: Check for possible race conditions.
-	// TODO: Review and refine code comments.
-	// TODO: Consider extracting runtime type reconversion into a dedicated trait.
 
 
 ?>

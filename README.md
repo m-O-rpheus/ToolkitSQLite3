@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 0.99
+### Version 1.0
 
 ---
 
@@ -10,12 +10,12 @@ It provides a clean, predictable, and safe API for common database operations, i
 ## Features
 - Tables: existence checks, creation, and deletion.
 - Columns: existence checks, creation, and deletion.
-- Rows: existence checks, creation or update (UPSERT), and deletion.
+- Rows: existence checks, insert or update (UPSERT), and deletion.
 - Strict validation of table and column names.
-- Use of prepared statements and input validation.
-- No fixed data type definitions per column; instead dynamic typing at the value level (SQLite3-typical).
+- Uses prepared statements and strict input validation.
+- No fixed data type definitions per column; instead, values use SQLite3-style dynamic typing.
 - Focus on a simple API, high performance, and protection against SQL injection.
-- Retrieving data via SELECT using common predicates.
+- SELECT queries with common predicates.
 
 ## Requirements
 - PHP 8.1 or higher
@@ -107,7 +107,7 @@ else {
 ```
 
 ## Row Handling
-Each row is uniquely identified by a _slug value. This field is predefined within the API and serves as a unique identifier for individual records. Neither the _slug nor the stored values are subject to any restrictions regarding characters or length. All inputs are internally handled using prepared statements to ensure proper and secure parameter binding.
+Each row is uniquely identified by its _slug value. This field is internally managed by the API and serves as a unique identifier for individual records. Neither the _slug nor the stored values are subject to any restrictions regarding characters or length. All inputs are internally handled using prepared statements to ensure proper and secure parameter binding.
 
 ### Check if a row exists
 ```php
@@ -127,8 +127,8 @@ Behavior
 - _created_at is set only on initial insert.
 - _updated_at is set on both insert and update operations.
 
-The defined name-value pairs determine which columns are created or updated. Column names must be strings and must already exist in the database schema.
-Values may use the following PHP data types, which are internally mapped to SQLite’s dynamic typing system at the value level:
+The provided column-value pairs determine which columns are created or updated. Column names must be strings and must already exist in the database schema.
+The following PHP data types are supported and internally mapped to SQLite’s dynamic typing system:
 - `null` → `SQLITE3_NULL`
 - `string` → `SQLITE3_TEXT`
 - `int` → `SQLITE3_INTEGER`
@@ -174,7 +174,7 @@ $db->row_remove( 'post_1' );
 // Last check 01.01.2026
 ```
 
-## SELECT Query
+## SELECT Queries
 The select() method provides a structured and safe abstraction layer for building SQLite3 SELECT queries.
 
 Instead of writing raw SQL manually, queries are defined using associative arrays and logical expression trees. All values are internally bound using prepared statements, while table and column identifiers are validated before execution.
@@ -193,7 +193,7 @@ If no arguments are provided:
 - all rows are returned
 - no filtering is applied
 ```php
-$result = $db->select([])
+$result = $db->select([]);
 // Last check 12.05.2026
 ```
 
@@ -207,7 +207,7 @@ $result = $db->select([
 ```
 
 ### DISTINCT
-Use distinct => true to remove duplicate rows.
+Removes duplicate rows from the result set.
 ```php
 $result = $db->select([
     'distinct' => true,
@@ -217,7 +217,7 @@ $result = $db->select([
 ```
 
 ### ORDER BY
-Use the orderby argument.
+Defines the result ordering based on one or more columns with ASC or DESC direction.
 ```php
 $result = $db->select([
     'orderby' => [
@@ -229,6 +229,7 @@ $result = $db->select([
 ```
 
 ### LIMIT
+Restricts the maximum number of rows returned by the query.
 ```php
 $result = $db->select([
     'limit' => 10
@@ -237,6 +238,7 @@ $result = $db->select([
 ```
 
 ### OFFSET
+Defines the number of rows to skip before returning results.
 ```php
 $result = $db->select([
     'offset' => 20
@@ -244,9 +246,9 @@ $result = $db->select([
 // Last check 12.05.2026
 ```
 
-### WHERE 
-#### Binary predicate
+### WHERE
 The where argument accepts a structured logical expression tree.
+#### Binary predicate
 ```php
 $result = $db->select([
     'where' => [
@@ -434,7 +436,7 @@ If invalid parameters are detected, execution stops immediately with a clear err
 ## Notes
 - Empty WHERE trees throw an exception.
 - Unsupported operators are rejected automatically.
-- SQLite runtime types are retrieved using `typeof()` for every selected column.
+- SQLite runtime types are determined using `typeof()` for every selected column.
 - Nested logical expressions are fully recursive.
 - LIMIT and OFFSET values are clamped to a minimum of `0`.
 
@@ -442,7 +444,7 @@ If invalid parameters are detected, execution stops immediately with a clear err
 - `PRAGMA table_info` is used for schema validation.
 - SQLite3 internally caches schema information.
 - For typical workloads, this is not a performance bottleneck.
-- No unnecessary caching logic is introduced.
+- No additional caching layer is introduced.
 
 ## Design Philosophy
 - No ORM
@@ -471,12 +473,22 @@ ToolkitSQLite3-main
 
 ---
 
+#### Version 1.0 Changelog:
+- Code fully reviewed and extensively refactored
+- Naming conventions standardized and made consistent across the project
+- Comments cleaned up, reduced, and structurally unified
+- Documentation reviewed and aligned with the current implementation
+- Internal logic and workflows validated and stabilized
+- Error handling centralized and standardized
+- Prepared statement handling reviewed and made more robust
+- SQL generation and parameter binding checked for consistency and safety
+
 #### Version 0.99 Changelog:
 - Code Quality.
 - Finalized return of the selected method.
 
 #### Version 0.98 Changelog:
-- Complete overhaul of the code.
+- Complete codebase overhaul.
 
 #### Version 0.97 Changelog:
 - Code Quality.
@@ -485,7 +497,7 @@ ToolkitSQLite3-main
 - Code Quality.
 
 #### Version 0.95 Changelog:
-- Update README.md and text indentation ToolkitSQLite3.php
+- Updated README.md and text indentation in ToolkitSQLite3.php.
 
 #### Version 0.94 Changelog:
 - Added LICENSE file and license info in source code.

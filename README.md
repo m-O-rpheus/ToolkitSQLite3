@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.0
+### Version 1.1
 
 ---
 
@@ -134,8 +134,9 @@ The following PHP data types are supported and internally mapped to SQLite’s d
 - `int` → `SQLITE3_INTEGER`
 - `float` → `SQLITE3_FLOAT`
 - `resource` → `SQLITE3_BLOB`
+- `array` → `SQLITE3_BLOB` (encoded as JSON)
 
-Note: Due to SQLite3 limitations, values such as `bool` or `array` are not supported directly and should be converted beforehand, for example to `integer` or `JSON`.
+Both resource values and array values share the same SQLite storage class (BLOB). To disambiguate these two logically different data types, arrays are serialized into JSON before storage and are prefixed with a dedicated alias marker. This alias ensures that JSON-encoded payloads can be reliably distinguished from raw binary stream data when reading from the database.
 ```php
 $row = ['title' => 'Hello World 1', 'views' => 42];
 
@@ -472,6 +473,12 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.1 Changelog:
+- Added support for storing PHP arrays via JSON encoding in BLOB columns.
+- Introduced a type alias prefix for JSON payloads to distinguish them from raw resource BLOB data.
+- Enhanced BLOB handling to support both binary streams (resource) and structured data (array) within the same storage class.
+- Improved decode logic to automatically restore JSON-tagged arrays on retrieval.
 
 #### Version 1.0 Changelog:
 - Code fully reviewed and extensively refactored

@@ -29,9 +29,10 @@
 
 
 
-		protected static $tblprefix = 'toolkitsqlite3_'; // Prefix used to identify the context, prepended to table names.
-		protected static $typealias = '_typeof_';        // Temporary prefix for generated SELECT alias columns that store SQLite3 value types.
-		protected static $maxlength = 512;               // Maximum length for table and column names (excluding the prefix).
+		protected const TABLE_PREFIX = 'toolkitsqlite3_';               // Prefix used to identify the context and is prepended to table names.
+		protected const TYPE_ALIAS   = '_typeof_';                      // Prefix for SELECT alias columns used to temporarily store SQLite3 value types.
+		protected const JSON_ALIAS   = '@@<#~TOOLKITSQLITE3~JSON~#>@@'; // Prefix used to mark JSON blobs.
+		protected const MAX_LENGTH   = 512;                             // Maximum length for table and column names (excluding the prefix).
 
 
 
@@ -43,7 +44,7 @@
 			self::error_if_invalid_sqlite_name( $tableName );
 
 			$this->sqlite = new SQLite3( $fileName );
-			$this->tblnam = static::$tblprefix . $tableName;
+			$this->tblnam = static::TABLE_PREFIX . $tableName;
 		}
 
 		public function __destruct() {
@@ -69,7 +70,7 @@
 
 		// Executes a prepared SQLite3 statement. The method accepts an SQL string with named placeholders as well as an associative array of parameter names mapped to values.
 		// Since columns are not strictly typed (using flexible storage types), the actual SQLite3 affinity is derived from the PHP data type.
-		// The following PHP data types are possible: null, string, float, int, resource.
+		// The following PHP data types are possible: null, string, float, int, array, resource.
 		// The callback is executed only if all bindings were successfully applied.
 		private function consume_query( string $sql, array $bindings, callable $callback ) : void {
 
@@ -85,7 +86,7 @@
 					if( is_string( $paramName ) ) {
 
 						// paramName:  string
-						// paramValue: mixed  (null, string, float, int, resource)
+						// paramValue: mixed  (null, string, float, int, array, resource)
 						if( is_null( $paramValue ) ) {
 
 							$paramType = SQLITE3_NULL;
@@ -102,9 +103,17 @@
 
 							$paramType = SQLITE3_INTEGER;
 						}
+						else if( is_array( $paramValue ) ) {
+
+							if( ( $paramValue = self::tagged_json_encode( $paramValue ) ) !== false ) {
+
+								$paramType = SQLITE3_BLOB;
+							}
+							else self::error_if_invalid_type();
+						}
 						else if( is_resource( $paramValue ) ) {
 
-							if( ( $paramValue = self::resource2string( $paramValue ) ) !== false ) {
+							if( ( $paramValue = self::resource_to_string( $paramValue ) ) !== false ) {
 
 								$paramType = SQLITE3_BLOB;
 							}
@@ -150,14 +159,14 @@
 
 
 
-	// Conversion helpers between PHP strings and stream resources.
+	// Conversion helpers between PHP strings, stream resources and tagged JSON blobs.
 	// -----------------------------------------------------------------------------------------------------------------------------
 
 	trait ToolkitSQLite3_methods_convert {
 
 
-		// Convert resource to string helper.
-		final public static function resource2string( mixed $data ) : mixed {
+		// Convert helper, stream resource to string.
+		final public static function resource_to_string( mixed $data ) : mixed {
 
 			$fnResult = false;
 
@@ -177,8 +186,8 @@
 
 
 
-		// Convert string to resource helper.
-		final public static function string2resource( mixed $data ) : mixed {
+		// Convert helper, string to stream resource.
+		final public static function string_to_resource( mixed $data ) : mixed {
 
 			$fnResult = false;
 
@@ -197,6 +206,43 @@
 			/** @var resource|false */
 			return $fnResult;
 		}
+
+
+
+		// Convert helper, array to tagged JSON blob.
+		private static function tagged_json_encode( array $data ) : string|false {
+
+			$fnResult = false;
+
+			if( ( $data = json_encode( $data ) ) !== false ) {
+
+				$fnResult = static::JSON_ALIAS . $data;
+			}
+
+			/** @var string|false */
+			return $fnResult;
+		}
+
+
+
+		// Convert helper, tagged JSON blob to array.
+		private static function tagged_json_decode( string $data ) : array|false {
+
+			$fnResult = false;
+
+			if( str_starts_with( $data, static::JSON_ALIAS ) ) {
+
+				$data = json_decode( substr( $data, strlen( static::JSON_ALIAS ) ), true );
+
+				if( json_last_error() === JSON_ERROR_NONE ) {
+
+					$fnResult = $data;
+				}
+			}
+
+			/** @var array|false */
+			return $fnResult;
+		}
 	}
 
 
@@ -211,9 +257,9 @@
 
 		private static function error_if_invalid_sqlite_name( string $name ) : void {
 
-			if( strlen( $name ) > static::$maxlength || preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
+			if( strlen( $name ) > static::MAX_LENGTH || preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
 
-				throw new InvalidArgumentException( 'ToolkitSQLite3: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::$maxlength . ' characters long.' );
+				throw new InvalidArgumentException( 'ToolkitSQLite3: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::MAX_LENGTH . ' characters long.' );
 			}
 		}
 
@@ -235,7 +281,7 @@
 
 		private static function error_if_invalid_type() : void {
 
-			throw new InvalidArgumentException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, resource.' );
+			throw new InvalidArgumentException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, array, resource.' );
 		}
 
 
@@ -527,7 +573,7 @@
 
 			$this->consume_query( $sql, $this->selectBindings, function( SQLite3Result $result ) use ( &$fnResult ) : void {
 
-				$len = strlen( static::$typealias );
+				$len = strlen( static::TYPE_ALIAS );
 
 				while( ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
 
@@ -537,7 +583,7 @@
 
 						$attributeKey = 'value';
 
-						if( str_starts_with( $columnName, static::$typealias ) ) {
+						if( str_starts_with( $columnName, static::TYPE_ALIAS ) ) {
 
 							$attributeKey = 'type';
 							$columnName   = substr( $columnName, $len );
@@ -550,25 +596,29 @@
 
 						if( $attribute['type'] === 'null' ) {
 
-							$record[$columnName] = null;
+							$record[$columnName] = null; // Null
 						}
 						else if( $attribute['type'] === 'text' ) {
 
-							$record[$columnName] = strval( $attribute['value'] );
+							$record[$columnName] = strval( $attribute['value'] ); // String
 						}
 						else if( $attribute['type'] === 'real' ) {
 
-							$record[$columnName] = floatval( $attribute['value'] );
+							$record[$columnName] = floatval( $attribute['value'] ); // Float
 						}
 						else if( $attribute['type'] === 'integer' ) {
 
-							$record[$columnName] = intval( $attribute['value'] );
+							$record[$columnName] = intval( $attribute['value'] ); // Integer
 						}
 						else if( $attribute['type'] === 'blob' ) {
 
-							if( ( $attribute['value'] = self::string2resource( $attribute['value'] ) ) !== false ) {
+							if( ( $val = self::tagged_json_decode( $attribute['value'] ) ) !== false ) {
 
-								$record[$columnName] = $attribute['value'];
+								$record[$columnName] = $val; // Array
+							}
+							else if( ( $val = self::string_to_resource( $attribute['value'] ) ) !== false ) {
+
+								$record[$columnName] = $val; // Resource
 							}
 							else self::error_if_invalid_type();
 						}
@@ -642,7 +692,7 @@
 				}
 
 				$columnParts[] = $columnName;
-				$columnParts[] = 'typeof(' . $columnName . ') AS ' . static::$typealias . $columnName;
+				$columnParts[] = 'typeof(' . $columnName . ') AS ' . static::TYPE_ALIAS . $columnName;
 			}
 
 			/** @var string */

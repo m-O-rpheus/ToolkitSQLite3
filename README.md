@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.1
+### Version 1.2
 
 ---
 
@@ -249,7 +249,7 @@ $result = $db->select([
 
 ### WHERE
 The where argument accepts a structured logical expression tree.
-#### Binary predicate
+#### Binary predicate (=, !=, <, <=, >, >=, LIKE, GLOB)
 ```php
 $result = $db->select([
     'where' => [
@@ -473,6 +473,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.2 Changelog:
+- Updated README.md.
 
 #### Version 1.1 Changelog:
 - Added support for storing PHP arrays via JSON encoding in BLOB columns.

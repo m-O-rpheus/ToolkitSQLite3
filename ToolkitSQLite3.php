@@ -29,6 +29,11 @@
 
 
 
+
+
+		// Protected constants used for configuration and default settings.
+		// -----------------------------------------------------------------------------------------------------------------------------
+
 		protected const TABLE_PREFIX = 'toolkitsqlite3_';               // Prefix used to identify the context and is prepended to table names.
 		protected const TYPE_ALIAS   = '_typeof_';                      // Prefix for SELECT alias columns used to temporarily store SQLite3 value types.
 		protected const JSON_ALIAS   = '@@<#~TOOLKITSQLITE3~JSON~#>@@'; // Prefix used to mark JSON blobs.
@@ -36,6 +41,10 @@
 
 
 
+
+
+		// Private members and helper methods used internally for class functionality.
+		// -----------------------------------------------------------------------------------------------------------------------------
 		private readonly SQLite3 $sqlite;
 		private readonly string  $tblnam;
 

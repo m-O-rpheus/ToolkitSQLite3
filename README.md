@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2
+### Version 1.2.1
 
 ---
 
@@ -473,6 +473,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.2.1 Changelog:
+- Added and improved code comments for better readability and maintainability.
 
 #### Version 1.2 Changelog:
 - Updated README.md.

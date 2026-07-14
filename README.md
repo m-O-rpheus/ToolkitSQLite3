@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2.1
+### Version 1.2.2
 
 ---
 
@@ -473,6 +473,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.2.2 Changelog:
+- Renamed error handling methods for clearer naming and improved validation exception handling.
 
 #### Version 1.2.1 Changelog:
 - Added and improved code comments for better readability and maintainability.

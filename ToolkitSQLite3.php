@@ -50,7 +50,7 @@
 
 		public function __construct( string $fileName, string $tableName ) {
 
-			self::error_if_invalid_sqlite_name( $tableName );
+			self::throw_invalid_sqlite_name( $tableName );
 
 			$this->sqlite = new SQLite3( $fileName );
 			$this->tblnam = static::TABLE_PREFIX . $tableName;
@@ -118,7 +118,7 @@
 
 								$paramType = SQLITE3_BLOB;
 							}
-							else self::error_if_invalid_type();
+							else self::throw_unsupported_data_type();
 						}
 						else if( is_resource( $paramValue ) ) {
 
@@ -126,9 +126,9 @@
 
 								$paramType = SQLITE3_BLOB;
 							}
-							else self::error_if_invalid_type();
+							else self::throw_unsupported_data_type();
 						}
-						else self::error_if_invalid_type();
+						else self::throw_unsupported_data_type();
 
 						if( ( $stmt->bindValue( $paramName, $paramValue, $paramType ) ) !== false ) {
 
@@ -159,7 +159,7 @@
 
 			if( $err ) {
 
-				self::error_if_statement_binding_failed();
+				self::throw_statement_binding_failed();
 			}
 		}
 	}
@@ -264,39 +264,39 @@
 	trait ToolkitSQLite3_methods_errors {
 
 
-		private static function error_if_invalid_sqlite_name( string $name ) : void {
+		private static function throw_invalid_sqlite_name( string $name ) : void {
 
 			if( strlen( $name ) > static::MAX_LENGTH || preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
 
-				throw new InvalidArgumentException( 'ToolkitSQLite3: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::MAX_LENGTH . ' characters long.' );
+				throw new RuntimeException( 'ToolkitSQLite3: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::MAX_LENGTH . ' characters long.' );
 			}
 		}
 
 
-		private static function error_if_empty_sqlite_slug( string $slug ) : void {
+		private static function throw_empty_row_slug( string $slug ) : void {
 
 			if( strlen( $slug ) === 0 ) {
 
-				throw new InvalidArgumentException( 'ToolkitSQLite3: The row slug in SQLite3 must not be empty.' );
+				throw new RuntimeException( 'ToolkitSQLite3: The row slug in SQLite3 must not be empty.' );
 			}
 		}
 
 
-		private static function error_if_where_all_predicate_empty() : void {
+		private static function throw_where_all_predicate_empty() : void {
 
-			throw new InvalidArgumentException( 'ToolkitSQLite3: Failed to generate the SQLite3 WHERE clause. No valid predicate expression could be resolved from the provided WHERE definition.' );
+			throw new RuntimeException( 'ToolkitSQLite3: Failed to generate the SQLite3 WHERE clause. No valid predicate expression could be resolved from the provided WHERE definition.' );
 		}
 
 
-		private static function error_if_invalid_type() : void {
+		private static function throw_unsupported_data_type() : void {
 
-			throw new InvalidArgumentException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, array, resource.' );
+			throw new RuntimeException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, array, resource.' );
 		}
 
 
-		private static function error_if_statement_binding_failed() : void {
+		private static function throw_statement_binding_failed() : void {
 
-			throw new InvalidArgumentException( 'ToolkitSQLite3: Binding of values for the prepared statement failed due to an unexpected error.' );
+			throw new RuntimeException( 'ToolkitSQLite3: Binding of values for the prepared statement failed due to an unexpected error.' );
 		}
 	}
 
@@ -379,7 +379,7 @@
 		// Returns true if the column exists, otherwise false.
 		public function column_exists( string $columnName ) : bool {
 
-			self::error_if_invalid_sqlite_name( $columnName );
+			self::throw_invalid_sqlite_name( $columnName );
 
 			$bindings = [':column' => $columnName];
 
@@ -457,7 +457,7 @@
 		// Returns true if the row exists, otherwise false.
 		public function row_isset( string $rowSlug ) : bool {
 
-			self::error_if_empty_sqlite_slug( $rowSlug );
+			self::throw_empty_row_slug( $rowSlug );
 
 			$bindings = [':slug' => $rowSlug];
 
@@ -483,7 +483,7 @@
 		// Returns true if the query executed successfully (insert or update), false on query error.
 		public function row_upsert( string $rowSlug, array $columnNameValuePair ) : bool {
 
-			self::error_if_empty_sqlite_slug( $rowSlug );
+			self::throw_empty_row_slug( $rowSlug );
 
 			$columns  = ['_slug'];
 			$params   = [':slug'];
@@ -492,7 +492,7 @@
 
 			foreach( $columnNameValuePair as $columnName => $columnValue ) {
 
-				self::error_if_invalid_sqlite_name( $columnName );
+				self::throw_invalid_sqlite_name( $columnName );
 
 				$token = $this->get_unique_token();
 
@@ -527,7 +527,7 @@
 		// Returns true if a row was deleted, or false if no matching row existed or the deletion failed.
 		public function row_remove( string $rowSlug ) : bool {
 
-			self::error_if_empty_sqlite_slug( $rowSlug );
+			self::throw_empty_row_slug( $rowSlug );
 
 			$bindings = [':slug' => $rowSlug];
 
@@ -629,9 +629,9 @@
 
 								$record[$columnName] = $val; // Resource
 							}
-							else self::error_if_invalid_type();
+							else self::throw_unsupported_data_type();
 						}
-						else self::error_if_invalid_type();
+						else self::throw_unsupported_data_type();
 					}
 
 					$fnResult[] = $record;
@@ -697,7 +697,7 @@
 
 				if( !in_array( $columnName, $this->selectReserved, true ) ) {
 
-					self::error_if_invalid_sqlite_name( $columnName );
+					self::throw_invalid_sqlite_name( $columnName );
 				}
 
 				$columnParts[] = $columnName;
@@ -722,7 +722,7 @@
 
 				if( !in_array( $columnName, $this->selectReserved, true ) ) {
 
-					self::error_if_invalid_sqlite_name( $columnName );
+					self::throw_invalid_sqlite_name( $columnName );
 				}
 
 				$sortParts[] = $columnName . ' ' . ( strtoupper( strval( $direction ) ) === 'DESC' ? 'DESC' : 'ASC' );
@@ -830,7 +830,7 @@
 
 				if( !in_array( $node['column'], $this->selectReserved, true ) ) {
 
-					self::error_if_invalid_sqlite_name( $node['column'] );
+					self::throw_invalid_sqlite_name( $node['column'] );
 				}
 
 				// Register all specialized leaf predicate renderers.
@@ -854,7 +854,7 @@
 
 			if( empty( $fnResult ) ) {
 
-				self::error_if_where_all_predicate_empty();
+				self::throw_where_all_predicate_empty();
 			}
 
 			/** @var string */

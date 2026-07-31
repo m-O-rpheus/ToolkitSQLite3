@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2.2
+### Version 1.2.3
 
 ---
 
@@ -473,6 +473,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.2.3 Changelog:
+- Changed: Replaced void with never for methods that always throw an exception.
 
 #### Version 1.2.2 Changelog:
 - Renamed error handling methods for clearer naming and improved validation exception handling.

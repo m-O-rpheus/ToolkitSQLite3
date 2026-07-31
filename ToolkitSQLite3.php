@@ -45,12 +45,13 @@
 
 		// Private members and helper methods used internally for class functionality.
 		// -----------------------------------------------------------------------------------------------------------------------------
+
 		private readonly SQLite3 $sqlite;
 		private readonly string  $tblnam;
 
 		public function __construct( string $fileName, string $tableName ) {
 
-			self::throw_invalid_sqlite_name( $tableName );
+			self::validate_sqlite_name_guard_clause( $tableName );
 
 			$this->sqlite = new SQLite3( $fileName );
 			$this->tblnam = static::TABLE_PREFIX . $tableName;
@@ -162,6 +163,30 @@
 				self::throw_statement_binding_failed();
 			}
 		}
+
+
+
+
+
+		// Internal validation methods using exception handling.
+		// -----------------------------------------------------------------------------------------------------------------------------
+
+		private static function validate_sqlite_name_guard_clause( string $name ) : void {
+
+			if( strlen( $name ) > static::MAX_LENGTH || preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
+
+				self::throw_invalid_sqlite_name();
+			}
+		}
+
+
+		private static function validate_row_slug_guard_clause( string $slug ) : void {
+
+			if( strlen( $slug ) === 0 ) {
+
+				self::throw_empty_row_slug();
+			}
+		}
 	}
 
 
@@ -264,37 +289,31 @@
 	trait ToolkitSQLite3_methods_errors {
 
 
-		private static function throw_invalid_sqlite_name( string $name ) : void {
+		private static function throw_invalid_sqlite_name() : never {
 
-			if( strlen( $name ) > static::MAX_LENGTH || preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
-
-				throw new RuntimeException( 'ToolkitSQLite3: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::MAX_LENGTH . ' characters long.' );
-			}
+			throw new RuntimeException( 'ToolkitSQLite3: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::MAX_LENGTH . ' characters long.' );
 		}
 
 
-		private static function throw_empty_row_slug( string $slug ) : void {
+		private static function throw_empty_row_slug() : never {
 
-			if( strlen( $slug ) === 0 ) {
-
-				throw new RuntimeException( 'ToolkitSQLite3: The row slug in SQLite3 must not be empty.' );
-			}
+			throw new RuntimeException( 'ToolkitSQLite3: The row slug in SQLite3 must not be empty.' );
 		}
 
 
-		private static function throw_where_all_predicate_empty() : void {
+		private static function throw_where_all_predicate_empty() : never {
 
 			throw new RuntimeException( 'ToolkitSQLite3: Failed to generate the SQLite3 WHERE clause. No valid predicate expression could be resolved from the provided WHERE definition.' );
 		}
 
 
-		private static function throw_unsupported_data_type() : void {
+		private static function throw_unsupported_data_type() : never {
 
 			throw new RuntimeException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, array, resource.' );
 		}
 
 
-		private static function throw_statement_binding_failed() : void {
+		private static function throw_statement_binding_failed() : never {
 
 			throw new RuntimeException( 'ToolkitSQLite3: Binding of values for the prepared statement failed due to an unexpected error.' );
 		}
@@ -379,7 +398,7 @@
 		// Returns true if the column exists, otherwise false.
 		public function column_exists( string $columnName ) : bool {
 
-			self::throw_invalid_sqlite_name( $columnName );
+			self::validate_sqlite_name_guard_clause( $columnName );
 
 			$bindings = [':column' => $columnName];
 
@@ -457,7 +476,7 @@
 		// Returns true if the row exists, otherwise false.
 		public function row_isset( string $rowSlug ) : bool {
 
-			self::throw_empty_row_slug( $rowSlug );
+			self::validate_row_slug_guard_clause( $rowSlug );
 
 			$bindings = [':slug' => $rowSlug];
 
@@ -483,7 +502,7 @@
 		// Returns true if the query executed successfully (insert or update), false on query error.
 		public function row_upsert( string $rowSlug, array $columnNameValuePair ) : bool {
 
-			self::throw_empty_row_slug( $rowSlug );
+			self::validate_row_slug_guard_clause( $rowSlug );
 
 			$columns  = ['_slug'];
 			$params   = [':slug'];
@@ -492,7 +511,7 @@
 
 			foreach( $columnNameValuePair as $columnName => $columnValue ) {
 
-				self::throw_invalid_sqlite_name( $columnName );
+				self::validate_sqlite_name_guard_clause( $columnName );
 
 				$token = $this->get_unique_token();
 
@@ -527,7 +546,7 @@
 		// Returns true if a row was deleted, or false if no matching row existed or the deletion failed.
 		public function row_remove( string $rowSlug ) : bool {
 
-			self::throw_empty_row_slug( $rowSlug );
+			self::validate_row_slug_guard_clause( $rowSlug );
 
 			$bindings = [':slug' => $rowSlug];
 
@@ -697,7 +716,7 @@
 
 				if( !in_array( $columnName, $this->selectReserved, true ) ) {
 
-					self::throw_invalid_sqlite_name( $columnName );
+					self::validate_sqlite_name_guard_clause( $columnName );
 				}
 
 				$columnParts[] = $columnName;
@@ -722,7 +741,7 @@
 
 				if( !in_array( $columnName, $this->selectReserved, true ) ) {
 
-					self::throw_invalid_sqlite_name( $columnName );
+					self::validate_sqlite_name_guard_clause( $columnName );
 				}
 
 				$sortParts[] = $columnName . ' ' . ( strtoupper( strval( $direction ) ) === 'DESC' ? 'DESC' : 'ASC' );
@@ -830,7 +849,7 @@
 
 				if( !in_array( $node['column'], $this->selectReserved, true ) ) {
 
-					self::throw_invalid_sqlite_name( $node['column'] );
+					self::validate_sqlite_name_guard_clause( $node['column'] );
 				}
 
 				// Register all specialized leaf predicate renderers.

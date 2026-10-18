@@ -82,7 +82,7 @@
 		// Since columns are not strictly typed (using flexible storage types), the actual SQLite3 affinity is derived from the PHP data type.
 		// The following PHP data types are possible: null, string, float, int, array, resource.
 		// The callback is executed only if all bindings were successfully applied.
-		private function consume_query( string $sql, array $bindings, callable $callback ) : void {
+		private function consume_query( string $sql, array $bindings, Closure $callback ) : void {
 
 			$err = true;
 
@@ -147,7 +147,7 @@
 
 							$err = false;
 
-							/** @param callable(SQLite3Result) $callback */
+							/** @param Closure(SQLite3Result) $callback */
 							$callback( $result );
 						}
 						finally {

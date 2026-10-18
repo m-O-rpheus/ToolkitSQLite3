@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2.3
+### Version 1.2.4
 
 ---
 
@@ -473,6 +473,10 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.2.4 Changelog:
+- Changed: The callback parameter of consume_query() is now typed as Closure instead of callable.
+- Updated the callback docblock from callable to Closure.
 
 #### Version 1.2.3 Changelog:
 - Changed: Replaced void with never for methods that always throw an exception.

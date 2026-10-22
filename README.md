@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2.4
+### Version 1.2.5
 
 ---
 
@@ -455,6 +455,8 @@ If invalid parameters are detected, execution stops immediately with a clear err
 
 This toolkit is designed to be predictable, readable, and boring — in the best possible way.
 
+---
+
 ## Attribution / License Notice
 This repository is licensed under the MIT License.
 
@@ -473,6 +475,10 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.2.5 Changelog:
+- Code style: removed trailing whitespace in the license header. No functional changes.
+- README: added the separator `---` before the section "Attribution / License Notice".
 
 #### Version 1.2.4 Changelog:
 - Changed: The callback parameter of consume_query() is now typed as Closure instead of callable.

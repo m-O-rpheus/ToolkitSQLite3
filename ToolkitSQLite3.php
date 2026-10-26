@@ -758,12 +758,12 @@
 
 
 		// Helper to build the LIMIT clause for the SELECT statement.
-		// Restricts the maximum number of rows returned by the query.
+		// Restricts the maximum number of rows returned by the query. Without a valid limit, 'LIMIT -1' (no limit) is used, because SQLite3 only accepts OFFSET after LIMIT.
 		// Example usage: $db->select( ['limit' => 10] )
 		private function select_buildLimit( array $args ) : string {
 
 			/** @var string */
-			return ( isset( $args['limit'] ) && is_int( $args['limit'] ) ) ? 'LIMIT ' . max( 0, $args['limit'] ) : '';
+			return ( isset( $args['limit'] ) && is_int( $args['limit'] ) ) ? 'LIMIT ' . max( 0, $args['limit'] ) : 'LIMIT -1';
 		}
 
 

@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2.9
+### Version 1.3.0
 
 ---
 
@@ -490,6 +490,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.3.0 Changelog:
+- Bugfix: `select()` with `offset` but without `limit` no longer fails. SQLite3 only accepts `OFFSET` after `LIMIT`, so `LIMIT -1` (no limit) is added.
 
 #### Version 1.2.9 Changelog:
 - Code style: `isset()` instead of `array_key_exists()` for the logical operators `AND`, `OR` and `NOT` of the WHERE tree (the value must be an array anyway). No functional changes.

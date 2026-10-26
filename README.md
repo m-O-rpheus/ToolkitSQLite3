@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2.6
+### Version 1.2.7
 
 ---
 
@@ -194,56 +194,56 @@ If no arguments are provided:
 - all rows are returned
 - no filtering is applied
 ```php
-$result = $db->select([]);
+$result = $db->select( [] );
 // Last check 12.05.2026
 ```
 
 ### Selecting Specific Columns
 Use the columns argument to limit the selected columns.
 ```php
-$result = $db->select([
+$result = $db->select( [
     'columns' => ['title', 'views']
-]);
+] );
 // Last check 12.05.2026
 ```
 
 ### DISTINCT
 Removes duplicate rows from the result set.
 ```php
-$result = $db->select([
+$result = $db->select( [
     'distinct' => true,
     'columns'  => ['title']
-]);
+] );
 // Last check 12.05.2026
 ```
 
 ### ORDER BY
 Defines the result ordering based on one or more columns with ASC or DESC direction.
 ```php
-$result = $db->select([
+$result = $db->select( [
     'orderby' => [
         'views' => 'DESC',
         'title' => 'ASC'
     ]
-]);
+] );
 // Last check 12.05.2026
 ```
 
 ### LIMIT
 Restricts the maximum number of rows returned by the query.
 ```php
-$result = $db->select([
+$result = $db->select( [
     'limit' => 10
-]);
+] );
 // Last check 12.05.2026
 ```
 
 ### OFFSET
 Defines the number of rows to skip before returning results.
 ```php
-$result = $db->select([
+$result = $db->select( [
     'offset' => 20
-]);
+] );
 // Last check 12.05.2026
 ```
 
@@ -251,55 +251,55 @@ $result = $db->select([
 The where argument accepts a structured logical expression tree.
 #### Binary predicate (=, !=, <, <=, >, >=, LIKE, GLOB)
 ```php
-$result = $db->select([
+$result = $db->select( [
     'where' => [
         'column' => 'views',
         'op'     => '>=',
         'value'  => 100
     ]
-]);
+] );
 // Last check 12.05.2026
 ```
 
 #### Membership predicate (IN)
 ```php
-$result = $db->select([
+$result = $db->select( [
     'where' => [
         'column' => 'status',
         'op'     => 'IN',
         'values' => ['open', 'closed']
     ]
-]);
+] );
 // Last check 12.05.2026
 ```
 
 #### Range predicate (BETWEEN)
 ```php
-$result = $db->select([
+$result = $db->select( [
     'where' => [
         'column' => 'views',
         'op'     => 'BETWEEN',
         'min'    => 10,
         'max'    => 100
     ]
-]);
+] );
 // Last check 12.05.2026
 ```
 
 #### Null predicate (IS NULL)
 ```php
-$result = $db->select([
+$result = $db->select( [
     'where' => [
         'column' => 'payload',
         'op'     => 'IS NULL'
     ]
-]);
+] );
 // Last check 12.05.2026
 ```
 
 #### AND conditions
 ```php
-$result = $db->select([
+$result = $db->select( [
     'where' => [
         'AND' => [
             [
@@ -314,13 +314,13 @@ $result = $db->select([
             ]
         ]
     ]
-]);
+] );
 // Last check 12.05.2026
 ```
 
 #### OR conditions
 ```php
-$result = $db->select([
+$result = $db->select( [
     'where' => [
         'OR' => [
             [
@@ -335,13 +335,13 @@ $result = $db->select([
             ]
         ]
     ]
-]);
+] );
 // Last check 12.05.2026
 ```
 
 #### NOT conditions
 ```php
-$result = $db->select([
+$result = $db->select( [
     'where' => [
         'NOT' => [
             'column' => 'status',
@@ -349,14 +349,14 @@ $result = $db->select([
             'value'  => 'deleted'
         ]
     ]
-]);
+] );
 // Last check 12.05.2026
 ```
 
 #### Nested Logical Trees
 Complex logical structures can be nested arbitrarily.
 ```php
-$result = $db->select([
+$result = $db->select( [
     'where' => [
         'AND' => [
             [
@@ -380,13 +380,13 @@ $result = $db->select([
             ]
         ]
     ]
-]);
+] );
 // Last check 12.05.2026
 ```
 
 ## Combining Multiple Query Components
 ```php
-$result = $db->select([
+$result = $db->select( [
     'distinct' => true,
     'columns' => [
         'title',
@@ -411,7 +411,7 @@ $result = $db->select([
     ],
     'limit'  => 25,
     'offset' => 0
-]);
+] );
 // Last check 12.05.2026
 ```
 
@@ -490,6 +490,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.2.7 Changelog:
+- Code style: `[]` instead of `array()` (also in the example comments). The `select()` examples in comments and README are written as `select( [ … ] )`. No functional changes.
 
 #### Version 1.2.6 Changelog:
 - Bugfix: Parallel requests no longer fail with "database is locked". The connection waits up to 10 seconds for a lock (`busyTimeout()`) and uses the journal mode WAL, so readers and writers do not block each other. Both values are protected constants (`BUSY_TIMEOUT`, `JOURNAL_MODE`) and can be changed via class extension.

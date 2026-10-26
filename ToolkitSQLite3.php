@@ -678,7 +678,7 @@
 
 		// Helper to build the DISTINCT keyword for the SELECT statement.
 		// Removes duplicate rows from the result set.
-		// Example usage: $db->select([ 'distinct' => true ])
+		// Example usage: $db->select( ['distinct' => true] )
 		private function select_buildDistinct( array $args ) : string {
 
 			/** @var string */
@@ -690,7 +690,7 @@
 		// Helper to build the SELECT list for the SELECT statement.
 		// Returns all table columns if no column list is provided, otherwise only the specified columns.
 		// Generates a SELECT list that includes each column and its SQLite3 runtime type using typeof().
-		// Example usage: $db->select([ 'columns' => array( 'col1', 'col2' ) ])
+		// Example usage: $db->select( ['columns' => ['col1', 'col2']] )
 		private function select_buildList( array $args ) : string {
 
 			$columnParts = [];
@@ -735,7 +735,7 @@
 
 		// Helper to build the ORDER BY list for the SELECT statement.
 		// Defines the result ordering based on one or more columns with ASC or DESC direction.
-		// Example usage: $db->select([ 'orderby' => array( 'col1' => 'desc' ) ])
+		// Example usage: $db->select( ['orderby' => ['col1' => 'desc']] )
 		private function select_buildOrderBy( array $args ) : string {
 
 			$sortParts = [];
@@ -759,7 +759,7 @@
 
 		// Helper to build the LIMIT clause for the SELECT statement.
 		// Restricts the maximum number of rows returned by the query.
-		// Example usage: $db->select([ 'limit' => 10 ])
+		// Example usage: $db->select( ['limit' => 10] )
 		private function select_buildLimit( array $args ) : string {
 
 			/** @var string */
@@ -770,7 +770,7 @@
 
 		// Helper to build the OFFSET clause for the SELECT statement.
 		// Defines the number of rows to skip before returning results.
-		// Example usage: $db->select([ 'offset' => 10 ])
+		// Example usage: $db->select( ['offset' => 10] )
 		private function select_buildOffset( array $args ) : string {
 
 			/** @var string */
@@ -792,7 +792,7 @@
 		// Entry point for building the WHERE clause from a structured condition tree.
 		// The expression tree is evaluated by a Logical Tree Node Renderer (for logical structure such as AND/OR/NOT) and a Leaf Node Renderer (for atomic comparisons such as column operators and value checks).
 		// Due to this hierarchical complexity, the evaluation logic is separated into dedicated helper methods.
-		// Example usage: $db->select([ 'where' => array( ... ) ])
+		// Example usage: $db->select( ['where' => [...]] )
 		private function select_buildWhere( array $args ) : string {
 
 			$fnResult = '';
@@ -858,12 +858,12 @@
 
 				// Register all specialized leaf predicate renderers.
 				// The renderers are evaluated sequentially until the first non-empty SQL fragment is returned.
-				$predicates = array(
+				$predicates = [
 					'select_buildWhere__renderLeafNode__binaryPredicate',
 					'select_buildWhere__renderLeafNode__membershipPredicate',
 					'select_buildWhere__renderLeafNode__rangePredicate',
 					'select_buildWhere__renderLeafNode__nullPredicate',
-				);
+				];
 
 				foreach( $predicates as $predicate ) {
 
@@ -887,7 +887,7 @@
 
 
 		// Helper for the WHERE clause Builder - Leaf Node Renderer - Binary predicate - SQL: <column> OP <value>.
-		// Example usage: $db->select([ 'where' => array( 'column' => 'col1', 'op' => '=', 'value' => 'val1' ) ])
+		// Example usage: $db->select( ['where' => ['column' => 'col1', 'op' => '=', 'value' => 'val1']] )
 		private function select_buildWhere__renderLeafNode__binaryPredicate( array $node ) : string {
 
 			$fnResult = '';
@@ -907,7 +907,7 @@
 
 
 		// Helper for the WHERE clause Builder - Leaf Node Renderer - Membership predicate - SQL: <column> IN (<value list>).
-		// Example usage: $db->select([ 'where' => array( 'column' => 'col1', 'op' => 'IN', 'values' => array( 'val1', 'val2' ) ) ])
+		// Example usage: $db->select( ['where' => ['column' => 'col1', 'op' => 'IN', 'values' => ['val1', 'val2']]] )
 		private function select_buildWhere__renderLeafNode__membershipPredicate( array $node ) : string {
 
 			$fnResult = '';
@@ -936,7 +936,7 @@
 
 
 		// Helper for the WHERE clause Builder - Leaf Node Renderer - Range predicate - SQL: <column> BETWEEN <min> AND <max>.
-		// Example usage: $db->select([ 'where' => array( 'column' => 'col1', 'op' => 'BETWEEN', 'min' => 10, 'max' => 20 ) ])
+		// Example usage: $db->select( ['where' => ['column' => 'col1', 'op' => 'BETWEEN', 'min' => 10, 'max' => 20]] )
 		private function select_buildWhere__renderLeafNode__rangePredicate( array $node ) : string {
 
 			$fnResult = '';
@@ -959,7 +959,7 @@
 
 
 		// Helper for the WHERE clause Builder - Leaf Node Renderer - Null predicate - SQL: <column> IS NULL.
-		// Example usage: $db->select([ 'where' => array( 'column' => 'col1', 'op' => 'IS NULL' ) ])
+		// Example usage: $db->select( ['where' => ['column' => 'col1', 'op' => 'IS NULL']] )
 		private function select_buildWhere__renderLeafNode__nullPredicate( array $node ) : string {
 
 			$fnResult = '';

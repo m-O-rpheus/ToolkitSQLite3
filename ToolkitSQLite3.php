@@ -38,6 +38,8 @@
 		protected const TYPE_ALIAS   = '_typeof_';                      // Prefix for SELECT alias columns used to temporarily store SQLite3 value types.
 		protected const JSON_ALIAS   = '@@<#~TOOLKITSQLITE3~JSON~#>@@'; // Prefix used to mark JSON blobs.
 		protected const MAX_LENGTH   = 512;                             // Maximum length for table and column names (excluding the prefix).
+		protected const BUSY_TIMEOUT = 10000;                           // Milliseconds to wait for a lock of another process before "database is locked" (0 = fail immediately).
+		protected const JOURNAL_MODE = 'WAL';                           // SQLite3 journal mode (WAL: readers and writers do not block each other, stored in the database file).
 
 
 
@@ -54,6 +56,8 @@
 			self::validate_sqlite_name_guard_clause( $tableName );
 
 			$this->sqlite = new SQLite3( $fileName );
+			$this->sqlite->busyTimeout( static::BUSY_TIMEOUT );
+			$this->sqlite->exec( 'PRAGMA journal_mode = ' . static::JOURNAL_MODE . ';' );
 			$this->tblnam = static::TABLE_PREFIX . $tableName;
 		}
 

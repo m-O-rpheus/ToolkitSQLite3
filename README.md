@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2.5
+### Version 1.2.6
 
 ---
 
@@ -415,6 +415,21 @@ $result = $db->select([
 // Last check 12.05.2026
 ```
 
+## Concurrent Access
+Several processes (e.g. parallel requests) can use the same database file. Two protected constants control the behavior and can be changed via class extension (late static binding):
+- `BUSY_TIMEOUT` (default `10000`): milliseconds to wait for the lock of another process before an operation fails with "database is locked".
+- `JOURNAL_MODE` (default `'WAL'`): with Write-Ahead Logging, readers do not block writers and vice versa. SQLite3 creates the files `*-wal` and `*-shm` next to the database file, so the folder must be writable. WAL does not work on network file systems, use e.g. `'DELETE'` there.
+
+```php
+class ToolkitSQLite3Slow extends ToolkitSQLite3 {
+
+    protected const BUSY_TIMEOUT = 20000;
+    protected const JOURNAL_MODE = 'DELETE';
+}
+
+$db = new ToolkitSQLite3Slow( 'database.sqlite3', 'example_table' );
+```
+
 ## Reserved Columns
 The following columns are internally reserved and automatically allowed without validation:
 - _id
@@ -475,6 +490,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.2.6 Changelog:
+- Bugfix: Parallel requests no longer fail with "database is locked". The connection waits up to 10 seconds for a lock (`busyTimeout()`) and uses the journal mode WAL, so readers and writers do not block each other. Both values are protected constants (`BUSY_TIMEOUT`, `JOURNAL_MODE`) and can be changed via class extension.
 
 #### Version 1.2.5 Changelog:
 - Code style: removed trailing whitespace in the license header. No functional changes.

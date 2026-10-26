@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2.7
+### Version 1.2.8
 
 ---
 
@@ -491,6 +491,9 @@ ToolkitSQLite3-main
 
 ---
 
+#### Version 1.2.8 Changelog:
+- Revised the complete changelog: checked against the commits, completed short entries, marked breaking changes. Commits without a version are listed under the following version. No functional changes.
+
 #### Version 1.2.7 Changelog:
 - Code style: `[]` instead of `array()` (also in the example comments). The `select()` examples in comments and README are written as `select( [ … ] )`. No functional changes.
 
@@ -502,14 +505,15 @@ ToolkitSQLite3-main
 - README: added the separator `---` before the section "Attribution / License Notice".
 
 #### Version 1.2.4 Changelog:
-- Changed: The callback parameter of consume_query() is now typed as Closure instead of callable.
-- Updated the callback docblock from callable to Closure.
+- Changed: The callback parameter of `consume_query()` is now typed as `Closure` instead of `callable`.
+- Updated the callback docblock from `callable` to `Closure`.
 
 #### Version 1.2.3 Changelog:
-- Changed: Replaced void with never for methods that always throw an exception.
+- Changed: Replaced `void` with `never` for methods that always throw an exception. The validation is done by the new guard methods `validate_sqlite_name_guard_clause()` and `validate_row_slug_guard_clause()`, the `throw_*()` methods only throw.
 
 #### Version 1.2.2 Changelog:
-- Renamed error handling methods for clearer naming and improved validation exception handling.
+- Renamed error handling methods for clearer naming (`error_if_*()` → `throw_*()`, e.g. `throw_invalid_sqlite_name()`, `throw_unsupported_data_type()`).
+- Breaking change: All errors throw a `RuntimeException` instead of an `InvalidArgumentException`.
 
 #### Version 1.2.1 Changelog:
 - Added and improved code comments for better readability and maintainability.
@@ -522,29 +526,34 @@ ToolkitSQLite3-main
 - Introduced a type alias prefix for JSON payloads to distinguish them from raw resource BLOB data.
 - Enhanced BLOB handling to support both binary streams (resource) and structured data (array) within the same storage class.
 - Improved decode logic to automatically restore JSON-tagged arrays on retrieval.
+- The configuration values are protected constants (`TABLE_PREFIX`, `TYPE_ALIAS`, `JSON_ALIAS`, `MAX_LENGTH`), which can be changed via class extension.
+- Breaking change: `resource2string()` and `string2resource()` were renamed to `resource_to_string()` and `string_to_resource()`.
 
 #### Version 1.0 Changelog:
-- Code fully reviewed and extensively refactored
-- Naming conventions standardized and made consistent across the project
-- Comments cleaned up, reduced, and structurally unified
-- Documentation reviewed and aligned with the current implementation
-- Internal logic and workflows validated and stabilized
-- Error handling centralized and standardized
-- Prepared statement handling reviewed and made more robust
-- SQL generation and parameter binding checked for consistency and safety
+- Code fully reviewed and extensively refactored.
+- Naming conventions standardized and made consistent across the project.
+- Comments cleaned up, reduced, and structurally unified.
+- Documentation reviewed and aligned with the current implementation.
+- Internal logic and workflows validated and stabilized.
+- Error handling centralized and standardized: all error messages start with "ToolkitSQLite3:", new errors for unsupported data types and failed bindings of prepared statements.
+- Prepared statement handling reviewed and made more robust.
+- SQL generation and parameter binding checked for consistency and safety.
 
 #### Version 0.99 Changelog:
-- Code Quality.
-- Finalized return of the selected method.
+- Code Quality: new public helpers `resource2string()` and `string2resource()` for BLOB values.
+- Finalized return of the selected method: `select()` returns every value with its PHP type (`null`, `string`, `int`, `float`, BLOB as stream resource), determined with `typeof()`.
 
 #### Version 0.98 Changelog:
-- Complete codebase overhaul.
+- Complete codebase overhaul: the methods are split into traits (table, column, row, select, errors), all queries use prepared statements (`consume_query()`), errors throw exceptions instead of `trigger_error()`.
+- Breaking change: columns no longer have a fixed type (SQLite3 dynamic typing). `column_add_ignore( $name, $type )` and `column_delete_ignore( $name )` were replaced by `columns_add_ignore( ...$names )` and `columns_delete_ignore( ...$names )`, `table_column_add_ignore()` and `table_info_columns()` were removed.
+- Breaking change: `table_add_ignore()` and `table_delete_ignore()` return `bool` instead of `int`.
+- The connection is closed in `__destruct()`.
 
 #### Version 0.97 Changelog:
-- Code Quality.
+- Code Quality: new method `select()`, all queries run through the private helper `consume_query()`.
 
 #### Version 0.96 Changelog:
-- Code Quality.
+- Code Quality: `_created_at` and `_updated_at` have the default value of the current time.
 
 #### Version 0.95 Changelog:
 - Updated README.md and text indentation in ToolkitSQLite3.php.
@@ -553,13 +562,14 @@ ToolkitSQLite3-main
 - Added LICENSE file and license info in source code.
 
 #### Version 0.93 Changelog:
-- Update.
+- Update: README.md extended with examples for all methods.
 
 #### Version 0.92 Changelog:
-- Update.
+- Update: new error for columns that do not exist in the table.
 
 #### Version 0.91 Changelog:
-- Update.
+- Update: the error methods were renamed (`error_if_*()`), new errors for an empty row slug and an invalid column type.
+- Breaking change: removed the public methods `sanitize_sqlite_name()` and `sanitize_sqlite_type()`, invalid names and types trigger an error instead of being cleaned.
 
 #### Version 0.9 Changelog:
 - Init.

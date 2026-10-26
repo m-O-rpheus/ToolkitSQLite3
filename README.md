@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.2.8
+### Version 1.2.9
 
 ---
 
@@ -490,6 +490,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.2.9 Changelog:
+- Code style: `isset()` instead of `array_key_exists()` for the logical operators `AND`, `OR` and `NOT` of the WHERE tree (the value must be an array anyway). No functional changes.
 
 #### Version 1.2.8 Changelog:
 - Revised the complete changelog: checked against the commits, completed short entries, marked breaking changes. Commits without a version are listed under the following version. No functional changes.

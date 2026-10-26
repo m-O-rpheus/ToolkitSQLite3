@@ -818,15 +818,15 @@
 
 			$fnResult = '';
 
-			if( array_key_exists( 'AND', $node ) && is_array( $node['AND'] ) ) {
+			if( isset( $node['AND'] ) && is_array( $node['AND'] ) ) {
 
 				$fnResult = '(' . implode( ' AND ', array_filter( array_map( [$this, 'select_buildWhere__renderTreeNode'], $node['AND'] ) ) ) . ')';
 			}
-			else if( array_key_exists( 'OR', $node ) && is_array( $node['OR'] ) ) {
+			else if( isset( $node['OR'] ) && is_array( $node['OR'] ) ) {
 
 				$fnResult = '(' . implode( ' OR ', array_filter( array_map( [$this, 'select_buildWhere__renderTreeNode'], $node['OR'] ) ) ) . ')';
 			}
-			else if( array_key_exists( 'NOT', $node ) && is_array( $node['NOT'] ) ) {
+			else if( isset( $node['NOT'] ) && is_array( $node['NOT'] ) ) {
 
 				$fnResult = 'NOT (' . $this->select_buildWhere__renderTreeNode( $node['NOT'] ) . ')';
 			}

@@ -270,9 +270,7 @@
 
 			if( str_starts_with( $data, static::JSON_ALIAS ) ) {
 
-				$data = json_decode( substr( $data, strlen( static::JSON_ALIAS ) ), true );
-
-				if( json_last_error() === JSON_ERROR_NONE ) {
+				if( is_array( $data = json_decode( substr( $data, strlen( static::JSON_ALIAS ) ), true ) ) ) {
 
 					$fnResult = $data;
 				}

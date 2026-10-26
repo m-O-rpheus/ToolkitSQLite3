@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.0
+### Version 1.3.1
 
 ---
 
@@ -490,6 +490,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.3.1 Changelog:
+- Bugfix: `tagged_json_decode()` checks the decoded value with `is_array()` instead of `json_last_error()`. A JSON-tagged BLOB with valid JSON that is not an array (e.g. `"1"` or `null`) no longer causes a `TypeError` (return type `array|false`), it is treated like an invalid JSON payload.
 
 #### Version 1.3.0 Changelog:
 - Bugfix: `select()` with `offset` but without `limit` no longer fails. SQLite3 only accepts `OFFSET` after `LIMIT`, so `LIMIT -1` (no limit) is added.

@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.1
+### Version 1.3.2
 
 ---
 
@@ -490,6 +490,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.3.2 Changelog:
+- Code style: the section of the exception helpers (trait `ToolkitSQLite3_methods_errors`) has the uniform header "Centralized exception handling helpers.". No functional changes.
 
 #### Version 1.3.1 Changelog:
 - Bugfix: `tagged_json_decode()` checks the decoded value with `is_array()` instead of `json_last_error()`. A JSON-tagged BLOB with valid JSON that is not an array (e.g. `"1"` or `null`) no longer causes a `TypeError` (return type `array|false`), it is treated like an invalid JSON payload.

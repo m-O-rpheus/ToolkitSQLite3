@@ -285,7 +285,7 @@
 
 
 
-	// Centralized validation and error handling utilities.
+	// Centralized exception handling helpers.
 	// -----------------------------------------------------------------------------------------------------------------------------
 
 	trait ToolkitSQLite3_methods_errors {

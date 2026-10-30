@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.4.2
+### Version 1.4.3
 
 ---
 
@@ -416,13 +416,13 @@ Several processes (e.g. parallel requests) can use the same database file. Two p
 - `JOURNAL_MODE` (default `'WAL'`): with Write-Ahead Logging, readers do not block writers and vice versa. SQLite3 creates the files `*-wal` and `*-shm` next to the database file, so the folder must be writable. WAL does not work on network file systems, use e.g. `'DELETE'` there. The journal mode is stored permanently in the database file, so the constructor writes it only if it differs from the current mode (changing it does not use the busy timeout).
 
 ```php
-class ToolkitSQLite3Slow extends ToolkitSQLite3 {
+class ToolkitSQLite3New extends ToolkitSQLite3 {
 
 	protected const BUSY_TIMEOUT = 20000;
 	protected const JOURNAL_MODE = 'DELETE';
 }
 
-$db = new ToolkitSQLite3Slow( 'database.sqlite3', 'example_table' );
+$db = new ToolkitSQLite3New( 'database.sqlite3', 'example_table' );
 ```
 
 ## Reserved Columns
@@ -493,6 +493,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.4.3 Changelog:
+- README: the class extension in the example is named `ToolkitSQLite3New` instead of `ToolkitSQLite3Slow`. No functional changes.
 
 #### Version 1.4.2 Changelog:
 - Breaking change: README: the minimum requirement is PHP 8.3 (before: 8.1). New section "Requirements" (PHP, PHP extensions, PHP settings, browser, repositories, other requirements), structured the same in all repositories.

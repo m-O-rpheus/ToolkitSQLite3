@@ -183,7 +183,7 @@
 
 		private static function validate_sqlite_name_guard_clause( string $name ) : void {
 
-			if( strlen( $name ) > static::MAX_LENGTH || preg_match( '/^[a-zA-Z][a-zA-Z0-9_]*$/', $name ) !== 1 ) {
+			if( strlen( $name ) > static::MAX_LENGTH || preg_match( '/^[a-z][a-z0-9_]*$/', $name ) !== 1 ) {
 
 				self::throw_invalid_sqlite_name();
 			}
@@ -299,7 +299,7 @@
 
 		private static function throw_invalid_sqlite_name() : never {
 
-			throw new RuntimeException( 'ToolkitSQLite3: Invalid SQLite3 table or column name. It must start with a letter and contain only letters, digits, or underscores, and be at most ' . static::MAX_LENGTH . ' characters long.' );
+			throw new RuntimeException( 'ToolkitSQLite3: Invalid SQLite3 table or column name. It must start with a lowercase letter and contain only lowercase letters, digits, or underscores, and be at most ' . static::MAX_LENGTH . ' characters long.' );
 		}
 
 

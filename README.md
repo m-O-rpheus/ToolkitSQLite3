@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.4
+### Version 1.3.5
 
 ---
 
@@ -29,7 +29,7 @@ require 'ToolkitSQLite3.php';
 ```
 
 ## Basic Usage
-Table names must start with a letter and may only contain letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (this behavior can be modified using late static binding).
+Table names must start with a lowercase letter and may only contain lowercase letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (this behavior can be modified using late static binding).
 
 ```php
 $db = new ToolkitSQLite3( 'database.sqlite3', 'example_table' );
@@ -71,7 +71,7 @@ else {
 ```
 
 ## Column Handling
-Column names must start with a letter and may only contain letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (this behavior can be modified using late static binding). In contrast to traditional database systems, no fixed data types are defined per column. Instead, typing is handled dynamically at the value level, following the SQLite3-style approach.
+Column names must start with a lowercase letter and may only contain lowercase letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (this behavior can be modified using late static binding). In contrast to traditional database systems, no fixed data types are defined per column. Instead, typing is handled dynamically at the value level, following the SQLite3-style approach.
 
 ### Check if a column exists
 ```php
@@ -490,6 +490,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.3.5 Changelog:
+- Breaking change: table and column names must start with a lowercase letter and contain only lowercase letters, digits or underscores (before: also uppercase letters), otherwise a `RuntimeException` is thrown. SQLite3 compares names case-insensitively, so `B` and `b` are the same column: e.g. `columns_delete_ignore( 'B' )` checked `column_exists( 'B' )` case-sensitively. Callers with uppercase names must use lowercase names, existing databases with uppercase table or column names must be created again.
 
 #### Version 1.3.4 Changelog:
 - Code style: `select_buildList()` closes the result of `PRAGMA table_info` in a `finally` block, the same way as `consume_query()`. No functional changes.

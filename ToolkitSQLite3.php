@@ -51,6 +51,8 @@
 		private readonly SQLite3 $sqlite;
 		private readonly string  $tblnam;
 
+		// Validates the table name, opens the database file (it is created if it does not exist) and sets the busy timeout and the journal mode.
+		// The table is stored with the prefix TABLE_PREFIX (e.g. "toolkitsqlite3_example_table"). Every error throws a RuntimeException.
 		public function __construct( string $fileName, string $tableName ) {
 
 			self::validate_sqlite_name_guard_clause( $tableName );
@@ -76,6 +78,7 @@
 			$this->tblnam = static::TABLE_PREFIX . $tableName;
 		}
 
+		// Closes the database connection.
 		public function __destruct() {
 
 			$this->sqlite->close();
@@ -100,7 +103,7 @@
 		// Executes a prepared SQLite3 statement. The method accepts an SQL string with named placeholders as well as an associative array of parameter names mapped to values.
 		// Since columns are not strictly typed (using flexible storage types), the actual SQLite3 affinity is derived from the PHP data type.
 		// The following PHP data types are possible: null, string, float, int, array, resource.
-		// The callback is executed only if all bindings were successfully applied.
+		// The callback is executed only if all bindings were successfully applied, otherwise (e.g. a placeholder without a value) a RuntimeException is thrown.
 		private function consume_query( string $sql, array $bindings, Closure $callback ) : void {
 
 			// Every SQLite3 error (preparing, binding, executing and reading the rows in the callback) is passed on as a RuntimeException.
@@ -227,6 +230,7 @@
 
 
 		// Convert helper, stream resource to string.
+		// Returns the string, or false if the value is not a stream resource or the stream cannot be read.
 		final public static function resource_to_string( mixed $data ) : mixed {
 
 			$fnResult = false;
@@ -248,6 +252,7 @@
 
 
 		// Convert helper, string to stream resource.
+		// Returns the stream resource, or false if the value is not a string or the stream cannot be created.
 		final public static function string_to_resource( mixed $data ) : mixed {
 
 			$fnResult = false;
@@ -925,6 +930,7 @@
 		// Helper for the WHERE clause Builder - Leaf Node Renderer.
 		// Processes atomic WHERE expressions representing a single column-based condition.
 		// Each leaf node defines a basic predicate consisting of a column identifier, an operator, and the associated operand(s).
+		// Throws a RuntimeException if the node is no valid predicate (e.g. an unknown operator, a missing or null value, or an empty IN list).
 		private function select_buildWhere__renderLeafNode( array $node ) : string {
 
 			$fnResult = '';

@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.9
+### Version 1.4.0
 
 ---
 
@@ -28,7 +28,9 @@ require 'ToolkitSQLite3.php';
 ```
 
 ## Basic Usage
-Table names must start with a lowercase letter and may only contain lowercase letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (this behavior can be modified using late static binding).
+Table names must start with a lowercase letter and may only contain lowercase letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (protected constant `MAX_LENGTH`, can be changed via class extension, late static binding).
+
+The constructor opens the database file (it is created if it does not exist). The table is stored with the prefix of the protected constant `TABLE_PREFIX` (default `'toolkitsqlite3_'`), e.g. `toolkitsqlite3_example_table`.
 
 ```php
 $db = new ToolkitSQLite3( 'database.sqlite3', 'example_table' );
@@ -73,7 +75,7 @@ if( $db->table_delete_ignore() ) {
 ```
 
 ## Column Handling
-Column names must start with a lowercase letter and may only contain lowercase letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (this behavior can be modified using late static binding). In contrast to traditional database systems, no fixed data types are defined per column. Instead, typing is handled dynamically at the value level, following the SQLite3-style approach.
+Column names must start with a lowercase letter and may only contain lowercase letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (`MAX_LENGTH`, see above). In contrast to traditional database systems, no fixed data types are defined per column. Instead, typing is handled dynamically at the value level, following the SQLite3-style approach.
 
 ### Check if a column exists
 ```php
@@ -100,7 +102,7 @@ if( $db->columns_delete_ignore( 'title', 'views', 'payload', 'float' ) ) {
 ```
 
 ## Row Handling
-Each row is uniquely identified by its _slug value. This field is internally managed by the API and serves as a unique identifier for individual records. Neither the _slug nor the stored values are subject to any restrictions regarding characters or length. All inputs are internally handled using prepared statements to ensure proper and secure parameter binding.
+Each row is uniquely identified by its _slug value. This field is internally managed by the API and serves as a unique identifier for individual records. The _slug must not be empty, otherwise it is not restricted regarding characters or length (the same applies to the stored values). All inputs are internally handled using prepared statements to ensure proper and secure parameter binding.
 
 ### Check if a row exists
 ```php
@@ -128,6 +130,8 @@ The following PHP data types are supported and internally mapped to SQLite’s d
 - `resource` → `SQLITE3_BLOB`
 - `array` → `SQLITE3_BLOB` (encoded as JSON)
 
+Other types (e.g. `bool` or objects) throw a `RuntimeException` ("Unsupported data type").
+
 Both resource values and array values share the same SQLite storage class (BLOB). To disambiguate these two logically different data types, arrays are serialized into JSON before storage and are prefixed with a dedicated alias marker. This alias ensures that JSON-encoded payloads can be reliably distinguished from raw binary stream data when reading from the database.
 ```php
 $row = ['title' => 'Hello World 1', 'views' => 42];
@@ -140,14 +144,14 @@ if( $db->row_upsert( 'post_1', $row ) ) {
 ### UPSERT using loops
 ```php
 $rows = [
-    ['title' => 'Hello World 1', 'views' => 42],
-    ['title' => 'Hello World 1', 'views' => 42],
-    ['title' => 'Hello World 1', 'views' => 42],
+    'post_1' => ['title' => 'Hello World 1', 'views' => 42],
+    'post_2' => ['title' => 'Hello World 2', 'views' => 7],
+    'post_3' => ['title' => 'Hello World 3', 'views' => 0],
 ];
 
-foreach( $rows as $row ) {
+foreach( $rows as $slug => $row ) {
 
-    if( $db->row_upsert( 'post_1', $row ) ) {
+    if( $db->row_upsert( $slug, $row ) ) {
         echo 'Query was executed successfully';
     }
 }
@@ -236,7 +240,7 @@ $result = $db->select( [
 ```
 
 ### LIMIT
-Restricts the maximum number of rows returned by the query.
+Restricts the maximum number of rows returned by the query. The value must be an `int` (like `offset`), other values are ignored.
 ```php
 $result = $db->select( [
     'limit' => 10
@@ -252,7 +256,7 @@ $result = $db->select( [
 ```
 
 ### WHERE
-The where argument accepts a structured logical expression tree.
+The where argument accepts a structured logical expression tree. A leaf that is no valid predicate throws a `RuntimeException`: an unknown operator, a binary predicate without `value` or with `'value' => null` (use `IS NULL`), an `IN` with an empty `values` list, or a `BETWEEN` whose `min` or `max` is missing or not scalar.
 #### Binary predicate (=, !=, <, <=, >, >=, LIKE, GLOB)
 ```php
 $result = $db->select( [
@@ -454,7 +458,7 @@ If invalid parameters are detected, execution stops immediately with a clear err
 - LIMIT and OFFSET values are clamped to a minimum of `0`.
 
 ## Performance Notes
-- `PRAGMA table_info` is used for schema validation.
+- `PRAGMA table_info` is used to determine the columns (`select()` without `columns`, `column_exists()`).
 - SQLite3 internally caches schema information.
 - For typical workloads, this is not a performance bottleneck.
 - No additional caching layer is introduced.
@@ -487,6 +491,10 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.4.0 Changelog:
+- Comments: the constructor and the destructor have a description, `resource_to_string()` and `string_to_resource()` describe their return value (`false` on failure), `consume_query()` and `select_buildWhere__renderLeafNode()` mention the `RuntimeException`.
+- README: the section "Row Handling" no longer says that the `_slug` has no restrictions (an empty slug throws). New: the table prefix (`TABLE_PREFIX`) and the constant `MAX_LENGTH`, the `RuntimeException` for unsupported data types in `row_upsert()` and for invalid WHERE predicates, `limit` and `offset` must be an `int`. The example "UPSERT using loops" writes three different rows. The performance note on `PRAGMA table_info` describes its current use. No functional changes.
 
 #### Version 1.3.9 Changelog:
 - README: new section "Binary data (BLOB)" describes the conversion helpers `string_to_resource()` and `resource_to_string()` with an example and their return value (`false` on failure). No functional changes.

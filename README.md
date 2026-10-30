@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.4.4
+### Version 1.4.5
 
 ---
 
@@ -143,6 +143,7 @@ $rows = [
 	'post_1' => ['title' => 'Hello World 1', 'views' => 42, 'status' => 'active'],
 	'post_2' => ['title' => 'Hello World 2', 'views' => 7, 'status' => 'pending'],
 	'post_3' => ['title' => 'Hello World 3', 'views' => 150, 'status' => 'closed'],
+	'post_4' => ['title' => 'Hello World 1', 'views' => 120, 'status' => 'active'],
 ];
 
 foreach( $rows as $slug => $row ) {
@@ -196,6 +197,8 @@ The system supports:
 - sorting
 - LIMIT / OFFSET
 
+The comments below the following examples show the `_slug` of the found rows, based on the rows of the example "UPSERT using loops".
+
 ### Basic Usage
 If no arguments are provided:
 - all columns are selected
@@ -203,6 +206,7 @@ If no arguments are provided:
 - no filtering is applied
 ```php
 $result = $db->select( [] );
+// post_1, post_2, post_3, post_4 (all columns)
 ```
 
 `select()` returns an array of rows (an empty array if nothing matches). Each row is an associative array of column name => value. The value has the PHP type of its SQLite3 runtime type: `null`, `string`, `int`, `float`, `array` (JSON-encoded arrays) or a stream `resource` (other BLOBs, read it with `resource_to_string()`).
@@ -213,6 +217,7 @@ Use the columns argument to limit the selected columns.
 $result = $db->select( [
 	'columns' => ['title', 'views']
 ] );
+// 4 rows with the columns title and views
 ```
 
 ### DISTINCT
@@ -222,6 +227,7 @@ $result = $db->select( [
 	'distinct' => true,
 	'columns'  => ['title']
 ] );
+// 3 rows: Hello World 1, Hello World 2, Hello World 3
 ```
 
 ### ORDER BY
@@ -233,22 +239,25 @@ $result = $db->select( [
 		'title' => 'ASC'
 	]
 ] );
+// post_3, post_4, post_1, post_2
 ```
 
 ### LIMIT
 Restricts the maximum number of rows returned by the query. The value must be an `int` (like `offset`), other values are ignored.
 ```php
 $result = $db->select( [
-	'limit' => 10
+	'limit' => 2
 ] );
+// post_1, post_2
 ```
 
 ### OFFSET
 Defines the number of rows to skip before returning results.
 ```php
 $result = $db->select( [
-	'offset' => 20
+	'offset' => 2
 ] );
+// post_3, post_4
 ```
 
 ### WHERE
@@ -262,6 +271,7 @@ $result = $db->select( [
 		'value'  => 100
 	]
 ] );
+// post_3, post_4
 ```
 
 #### Membership predicate (IN)
@@ -273,6 +283,7 @@ $result = $db->select( [
 		'values' => ['open', 'closed']
 	]
 ] );
+// post_3
 ```
 
 #### Range predicate (BETWEEN)
@@ -285,6 +296,7 @@ $result = $db->select( [
 		'max'    => 100
 	]
 ] );
+// post_1
 ```
 
 #### Null predicate (IS NULL)
@@ -295,6 +307,7 @@ $result = $db->select( [
 		'op'     => 'IS NULL'
 	]
 ] );
+// post_1, post_2, post_3, post_4
 ```
 
 #### AND conditions
@@ -315,6 +328,7 @@ $result = $db->select( [
 		]
 	]
 ] );
+// post_1, post_4
 ```
 
 #### OR conditions
@@ -335,6 +349,7 @@ $result = $db->select( [
 		]
 	]
 ] );
+// post_1, post_2, post_4
 ```
 
 #### NOT conditions
@@ -348,6 +363,7 @@ $result = $db->select( [
 		]
 	]
 ] );
+// post_1, post_2, post_3, post_4
 ```
 
 #### Nested Logical Trees
@@ -378,6 +394,7 @@ $result = $db->select( [
 		]
 	]
 ] );
+// post_4
 ```
 
 ## Combining Multiple Query Components
@@ -408,6 +425,7 @@ $result = $db->select( [
 	'limit'  => 25,
 	'offset' => 0
 ] );
+// 2 rows: Hello World 1 with 120 views, Hello World 1 with 42 views
 ```
 
 ## Concurrent Access
@@ -495,6 +513,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.4.5 Changelog:
+- README: the SELECT examples show the expected result in a comment. The example "UPSERT using loops" has a fourth row with the same title as the first one, so that DISTINCT and the combined example return a visible result, and `limit` and `offset` fit the four rows (before: `10` and `20`, which returned all rows or no row at all). No functional changes.
 
 #### Version 1.4.4 Changelog:
 - README: the examples create and fill the column `status` that the WHERE examples use (before: "no such column: status"), the third row has 150 views, so that the examples with `>= 100` find a row. The section "Concurrent Access" notes that the journal mode can only be changed while no other connection has the database file open. No functional changes.

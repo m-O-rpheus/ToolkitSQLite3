@@ -57,7 +57,13 @@
 
 			$this->sqlite = new SQLite3( $fileName );
 			$this->sqlite->busyTimeout( static::BUSY_TIMEOUT );
-			$this->sqlite->exec( 'PRAGMA journal_mode = ' . static::JOURNAL_MODE . ';' );
+
+			// The journal mode is stored permanently in the database file, so it is only changed if it differs.
+			if( strcasecmp( strval( $this->sqlite->querySingle( 'PRAGMA journal_mode;' ) ), static::JOURNAL_MODE ) !== 0 ) {
+
+				$this->sqlite->exec( 'PRAGMA journal_mode = ' . static::JOURNAL_MODE . ';' );
+			}
+
 			$this->tblnam = static::TABLE_PREFIX . $tableName;
 		}
 
@@ -142,8 +148,8 @@
 					}
 				}
 
-				// Execute the statement only if all values were bound successfully.
-				if( array_keys( $bindings ) === $comparison ) {
+				// Execute the statement only if all passed values were bound successfully and the SQL contains no further placeholders (an unbound placeholder would be NULL silently).
+				if( array_keys( $bindings ) === $comparison && count( $comparison ) === $stmt->paramCount() ) {
 
 					if( ( $result = $stmt->execute() ) !== false ) {
 

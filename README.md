@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.2
+### Version 1.3.3
 
 ---
 
@@ -490,6 +490,10 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.3.3 Changelog:
+- Bugfix: the constructor writes the journal mode only if it differs from the current one (the mode, e.g. WAL, is stored permanently in the database file). Changing the journal mode does not use the busy timeout, in parallel operation it failed sporadically with "database is locked".
+- Bugfix: `consume_query()` executes the statement only if the SQL contains no placeholder without a value (`count( $comparison ) === $stmt->paramCount()`). Before, only the passed values were checked (`array_keys( $bindings ) === $comparison`), a placeholder in the SQL without a passed value was used as `NULL` silently and the row was stored with an empty value.
 
 #### Version 1.3.2 Changelog:
 - Code style: the section of the exception helpers (trait `ToolkitSQLite3_methods_errors`) has the uniform header "Centralized exception handling helpers.". No functional changes.

@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.8
+### Version 1.3.9
 
 ---
 
@@ -161,6 +161,26 @@ if( $db->row_remove( 'post_1' ) ) {
 else {
     echo 'No matching row';
 }
+```
+
+### Binary data (BLOB)
+Binary data is stored and read as a stream resource. Two static conversion helpers convert between strings and stream resources:
+- `string_to_resource( $data )`: converts a string into a stream resource for `row_upsert()`. Returns `false` if the value is not a string or the stream cannot be created.
+- `resource_to_string( $data )`: reads a stream resource (e.g. a BLOB value of `select()`) into a string. Returns `false` if the value is not a stream resource or the stream cannot be read.
+
+```php
+$blob = ToolkitSQLite3::string_to_resource( file_get_contents( 'image.avif' ) );
+
+if( $blob !== false ) {
+    $db->row_upsert( 'image_1', ['payload' => $blob] );
+}
+
+$rows = $db->select( [
+    'columns' => ['payload'],
+    'where'   => ['column' => '_slug', 'op' => '=', 'value' => 'image_1']
+] );
+
+$data = ToolkitSQLite3::resource_to_string( $rows[0]['payload'] ); // The binary string, or false on failure.
 ```
 
 ## SELECT Queries
@@ -467,6 +487,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.3.9 Changelog:
+- README: new section "Binary data (BLOB)" describes the conversion helpers `string_to_resource()` and `resource_to_string()` with an example and their return value (`false` on failure). No functional changes.
 
 #### Version 1.3.8 Changelog:
 - Breaking change: the connection uses `SQLite3::enableExceptions( true )`. Every SQLite3 error throws a `RuntimeException` (message "ToolkitSQLite3: (SQLite3 error) …", the original exception via `getPrevious()`, new helper `throw_rethrow_sqlite_error()`) instead of a PHP warning and the return value `false`. Also a database that cannot be opened (`new SQLite3()` throws a plain `Exception`) throws a `RuntimeException`. `table_add_ignore()`, `table_delete_ignore()`, `columns_add_ignore()` and `columns_delete_ignore()` return `true` or throw (callers that checked `false` now receive the exception), `columns_add_ignore()` and `columns_delete_ignore()` on a missing table throw "no such table".

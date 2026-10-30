@@ -708,15 +708,20 @@
 
 				if( ( $result = $this->sqlite->query( $sql ) ) !== false ) {
 
-					while( ( $col = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
+					try {
 
-						if( isset( $col['name'] ) ) {
+						while( ( $col = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
 
-							$columnNames[] = $col['name'];
+							if( isset( $col['name'] ) ) {
+
+								$columnNames[] = $col['name'];
+							}
 						}
 					}
+					finally {
 
-					$result->finalize();
+						$result->finalize();
+					}
 				}
 			}
 

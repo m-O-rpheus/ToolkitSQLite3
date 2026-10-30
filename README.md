@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.3
+### Version 1.3.4
 
 ---
 
@@ -490,6 +490,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.3.4 Changelog:
+- Code style: `select_buildList()` closes the result of `PRAGMA table_info` in a `finally` block, the same way as `consume_query()`. No functional changes.
 
 #### Version 1.3.3 Changelog:
 - Bugfix: the constructor writes the journal mode only if it differs from the current one (the mode, e.g. WAL, is stored permanently in the database file). Changing the journal mode does not use the busy timeout, in parallel operation it failed sporadically with "database is locked".

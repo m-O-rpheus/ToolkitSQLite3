@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.6
+### Version 1.3.7
 
 ---
 
@@ -183,6 +183,8 @@ If no arguments are provided:
 ```php
 $result = $db->select( [] );
 ```
+
+`select()` returns an array of rows (an empty array if nothing matches). Each row is an associative array of column name => value. The value has the PHP type of its SQLite3 runtime type: `null`, `string`, `int`, `float`, `array` (JSON-encoded arrays) or a stream `resource` (other BLOBs, read it with `resource_to_string()`).
 
 ### Selecting Specific Columns
 Use the columns argument to limit the selected columns.
@@ -463,8 +465,11 @@ ToolkitSQLite3-main
 
 ---
 
+#### Version 1.3.7 Changelog:
+- Code style: `consume_query()` sets `$err = false` after the callback instead of before it (the statement counts as successful after the callback has finished). No functional changes.
+
 #### Version 1.3.6 Changelog:
-- Comments and README: `row_upsert()` and `row_remove()` never return `false` on a failing query, `consume_query()` throws a `RuntimeException` ("false on query error" and "or the deletion failed" were wrong). The comments of all methods that use `consume_query()` (`table_exists()`, `column_exists()`, `row_isset()`, `row_upsert()`, `row_remove()`, `select()`) mention it. The examples of `row_upsert()` no longer show an unreachable `else { echo 'Query error'; }`. `row_upsert()` does not create columns ("created or updated" was wrong). The section "Concurrent Access" explains that the journal mode is written only if it differs. The example of `row_remove()` shows the return value (`true` if a row was removed, `false` if no matching row existed). The comments "// Last check …" are removed from the examples. No functional changes.
+- Comments and README: `row_upsert()` and `row_remove()` never return `false` on a failing query, `consume_query()` throws a `RuntimeException` ("false on query error" and "or the deletion failed" were wrong). The comments of all methods that use `consume_query()` (`table_exists()`, `column_exists()`, `row_isset()`, `row_upsert()`, `row_remove()`, `select()`) mention it. The examples of `row_upsert()` no longer show an unreachable `else { echo 'Query error'; }`. `row_upsert()` does not create columns ("created or updated" was wrong). The section "Concurrent Access" explains that the journal mode is written only if it differs. The section "SELECT Queries" describes the return value of `select()` (array of rows, PHP types of the values). The example of `row_remove()` shows the return value (`true` if a row was removed, `false` if no matching row existed). The comments "// Last check …" are removed from the examples. No functional changes.
 
 #### Version 1.3.5 Changelog:
 - Breaking change: table and column names must start with a lowercase letter and contain only lowercase letters, digits or underscores (before: also uppercase letters), otherwise a `RuntimeException` is thrown. SQLite3 compares names case-insensitively, so `B` and `b` are the same column: e.g. `columns_delete_ignore( 'B' )` checked `column_exists( 'B' )` case-sensitively. Callers with uppercase names must use lowercase names, existing databases with uppercase table or column names must be created again.

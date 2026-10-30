@@ -155,10 +155,10 @@
 
 						try {
 
-							$err = false;
-
 							/** @param Closure(SQLite3Result) $callback */
 							$callback( $result );
+
+							$err = false;
 						}
 						finally {
 

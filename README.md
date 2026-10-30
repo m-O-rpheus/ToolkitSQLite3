@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.7
+### Version 1.3.8
 
 ---
 
@@ -34,6 +34,19 @@ Table names must start with a lowercase letter and may only contain lowercase le
 $db = new ToolkitSQLite3( 'database.sqlite3', 'example_table' );
 ```
 
+## Error Handling
+All errors throw a `RuntimeException`: invalid names or values, and every SQLite3 error (e.g. a database that cannot be opened, a missing table or a locked database). Methods that add, update or delete therefore return `true` or throw, they never return `false` on an error.
+
+```php
+try {
+    $db->table_add_ignore();
+    $db->columns_add_ignore( 'title', 'views' );
+}
+catch( RuntimeException $e ) {
+    echo 'Error: ' . $e->getMessage(); // The original SQLite3Exception is available via $e->getPrevious().
+}
+```
+
 ## Table Handling
 ### Check if a table exists
 ```php
@@ -50,18 +63,12 @@ else {
 if( $db->table_add_ignore() ) {
     echo 'Query was executed successfully';
 }
-else {
-    echo 'Query error';
-}
 ```
 
 ### Delete a table (ignored if it does not exist)
 ```php
 if( $db->table_delete_ignore() ) {
     echo 'Query was executed successfully';
-}
-else {
-    echo 'Query error';
 }
 ```
 
@@ -83,18 +90,12 @@ else {
 if( $db->columns_add_ignore( 'title', 'views', 'payload', 'float' ) ) {
     echo 'Query was executed successfully';
 }
-else {
-    echo 'Query error';
-}
 ```
 
 ### Delete columns (ignored if they do not exist)
 ```php
 if( $db->columns_delete_ignore( 'title', 'views', 'payload', 'float' ) ) {
     echo 'Query was executed successfully';
-}
-else {
-    echo 'Query error';
 }
 ```
 
@@ -424,6 +425,8 @@ All runtime values are bound using prepared statements. Table and column identif
 If invalid parameters are detected, execution stops immediately with a clear error message, preventing silent data loss or inconsistent schema states.
 
 ## Notes
+- All errors throw a `RuntimeException`, also SQLite3 errors (e.g. a database that cannot be opened, a locked database or an invalid query). The original `SQLite3Exception` (or `Exception` if the database cannot be opened) is available via `getPrevious()`.
+- `columns_add_ignore()` and `columns_delete_ignore()` are safe for concurrent processes: a column that another process added or removed at the same time counts as success.
 - Empty WHERE trees throw an exception.
 - Unsupported operators are rejected automatically.
 - SQLite runtime types are determined using `typeof()` for every selected column.
@@ -464,6 +467,12 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.3.8 Changelog:
+- Breaking change: the connection uses `SQLite3::enableExceptions( true )`. Every SQLite3 error throws a `RuntimeException` (message "ToolkitSQLite3: (SQLite3 error) …", the original exception via `getPrevious()`, new helper `throw_rethrow_sqlite_error()`) instead of a PHP warning and the return value `false`. Also a database that cannot be opened (`new SQLite3()` throws a plain `Exception`) throws a `RuntimeException`. `table_add_ignore()`, `table_delete_ignore()`, `columns_add_ignore()` and `columns_delete_ignore()` return `true` or throw (callers that checked `false` now receive the exception), `columns_add_ignore()` and `columns_delete_ignore()` on a missing table throw "no such table".
+- `try`/`catch( SQLite3Exception )` in the constructor (`catch( Exception )`), `consume_query()`, `table_add_ignore()`, `table_delete_ignore()`, `columns_add_ignore()`, `columns_delete_ignore()` and `select_buildList()`.
+- Bugfix (race condition): `columns_add_ignore()` and `columns_delete_ignore()` run one `ALTER TABLE` per column without `column_exists()` before (the column names are validated directly), "duplicate column name" and "no such column" count as success. Before, two processes that added (or removed) the same column at the same time failed. Tested with 8 parallel processes and 40 columns: before 53 (add) and 102 (delete) of 320 operations failed, now none.
+- README: new section "Error Handling", two notes, the examples of the four methods above no longer show an unreachable `else { echo 'Query error'; }`.
 
 #### Version 1.3.7 Changelog:
 - Code style: `consume_query()` sets `$err = false` after the callback instead of before it (the statement counts as successful after the callback has finished). No functional changes.

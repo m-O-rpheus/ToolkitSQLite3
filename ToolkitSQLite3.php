@@ -55,13 +55,22 @@
 
 			self::validate_sqlite_name_guard_clause( $tableName );
 
-			$this->sqlite = new SQLite3( $fileName );
-			$this->sqlite->busyTimeout( static::BUSY_TIMEOUT );
+			// Every SQLite3 error (opening and configuring the database) is passed on as a RuntimeException.
+			try {
 
-			// The journal mode is stored permanently in the database file, so it is only changed if it differs.
-			if( strcasecmp( strval( $this->sqlite->querySingle( 'PRAGMA journal_mode;' ) ), static::JOURNAL_MODE ) !== 0 ) {
+				$this->sqlite = new SQLite3( $fileName ); // Throws an Exception if the database cannot be opened.
+				$this->sqlite->enableExceptions( true );  // Must come directly after opening: every following SQLite3 call throws a SQLite3Exception on error (instead of a warning and false).
+				$this->sqlite->busyTimeout( static::BUSY_TIMEOUT );
 
-				$this->sqlite->exec( 'PRAGMA journal_mode = ' . static::JOURNAL_MODE . ';' );
+				// The journal mode is stored permanently in the database file, so it is only changed if it differs.
+				if( strcasecmp( strval( $this->sqlite->querySingle( 'PRAGMA journal_mode;' ) ), static::JOURNAL_MODE ) !== 0 ) {
+
+					$this->sqlite->exec( 'PRAGMA journal_mode = ' . static::JOURNAL_MODE . ';' );
+				}
+			}
+			catch( Exception $e ) {
+
+				self::throw_rethrow_sqlite_error( $e );
 			}
 
 			$this->tblnam = static::TABLE_PREFIX . $tableName;
@@ -94,83 +103,91 @@
 		// The callback is executed only if all bindings were successfully applied.
 		private function consume_query( string $sql, array $bindings, Closure $callback ) : void {
 
-			$err = true;
+			// Every SQLite3 error (preparing, binding, executing and reading the rows in the callback) is passed on as a RuntimeException.
+			try {
 
-			// Prepare the SQLite3 statement.
-			if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
+				$err = true;
 
-				$comparison = [];
+				// Prepare the SQLite3 statement.
+				if( ( $stmt = $this->sqlite->prepare( $sql ) ) !== false ) {
 
-				foreach( $bindings as $paramName => $paramValue ) {
+					$comparison = [];
 
-					if( is_string( $paramName ) ) {
+					foreach( $bindings as $paramName => $paramValue ) {
 
-						// paramName:  string
-						// paramValue: mixed  (null, string, float, int, array, resource)
-						if( is_null( $paramValue ) ) {
+						if( is_string( $paramName ) ) {
 
-							$paramType = SQLITE3_NULL;
-						}
-						else if( is_string( $paramValue ) ) {
+							// paramName:  string
+							// paramValue: mixed  (null, string, float, int, array, resource)
+							if( is_null( $paramValue ) ) {
 
-							$paramType = SQLITE3_TEXT;
-						}
-						else if( is_float( $paramValue ) ) {
+								$paramType = SQLITE3_NULL;
+							}
+							else if( is_string( $paramValue ) ) {
 
-							$paramType = SQLITE3_FLOAT;
-						}
-						else if( is_int( $paramValue ) ) {
+								$paramType = SQLITE3_TEXT;
+							}
+							else if( is_float( $paramValue ) ) {
 
-							$paramType = SQLITE3_INTEGER;
-						}
-						else if( is_array( $paramValue ) ) {
+								$paramType = SQLITE3_FLOAT;
+							}
+							else if( is_int( $paramValue ) ) {
 
-							if( ( $paramValue = self::tagged_json_encode( $paramValue ) ) !== false ) {
+								$paramType = SQLITE3_INTEGER;
+							}
+							else if( is_array( $paramValue ) ) {
 
-								$paramType = SQLITE3_BLOB;
+								if( ( $paramValue = self::tagged_json_encode( $paramValue ) ) !== false ) {
+
+									$paramType = SQLITE3_BLOB;
+								}
+								else self::throw_unsupported_data_type();
+							}
+							else if( is_resource( $paramValue ) ) {
+
+								if( ( $paramValue = self::resource_to_string( $paramValue ) ) !== false ) {
+
+									$paramType = SQLITE3_BLOB;
+								}
+								else self::throw_unsupported_data_type();
 							}
 							else self::throw_unsupported_data_type();
-						}
-						else if( is_resource( $paramValue ) ) {
 
-							if( ( $paramValue = self::resource_to_string( $paramValue ) ) !== false ) {
+							if( ( $stmt->bindValue( $paramName, $paramValue, $paramType ) ) !== false ) {
 
-								$paramType = SQLITE3_BLOB;
+								$comparison[] = $paramName;
 							}
-							else self::throw_unsupported_data_type();
 						}
-						else self::throw_unsupported_data_type();
+					}
 
-						if( ( $stmt->bindValue( $paramName, $paramValue, $paramType ) ) !== false ) {
+					// Execute the statement only if all passed values were bound successfully and the SQL contains no further placeholders (an unbound placeholder would be NULL silently).
+					if( array_keys( $bindings ) === $comparison && count( $comparison ) === $stmt->paramCount() ) {
 
-							$comparison[] = $paramName;
+						if( ( $result = $stmt->execute() ) !== false ) {
+
+							try {
+
+								/** @param Closure(SQLite3Result) $callback */
+								$callback( $result );
+
+								$err = false;
+							}
+							finally {
+
+								$result->finalize();
+							}
 						}
 					}
 				}
 
-				// Execute the statement only if all passed values were bound successfully and the SQL contains no further placeholders (an unbound placeholder would be NULL silently).
-				if( array_keys( $bindings ) === $comparison && count( $comparison ) === $stmt->paramCount() ) {
+				if( $err ) {
 
-					if( ( $result = $stmt->execute() ) !== false ) {
-
-						try {
-
-							/** @param Closure(SQLite3Result) $callback */
-							$callback( $result );
-
-							$err = false;
-						}
-						finally {
-
-							$result->finalize();
-						}
-					}
+					self::throw_statement_binding_failed();
 				}
 			}
+			catch( SQLite3Exception $e ) {
 
-			if( $err ) {
-
-				self::throw_statement_binding_failed();
+				self::throw_rethrow_sqlite_error( $e );
 			}
 		}
 
@@ -325,6 +342,12 @@
 
 			throw new RuntimeException( 'ToolkitSQLite3: Binding of values for the prepared statement failed due to an unexpected error.' );
 		}
+
+
+		private static function throw_rethrow_sqlite_error( Exception $e ) : never {
+
+			throw new RuntimeException( 'ToolkitSQLite3: (SQLite3 error) ' . $e->getMessage(), 0, $e );
+		}
 	}
 
 
@@ -361,7 +384,7 @@
 
 
 		// Creates the table if it does not exist.
-		// Returns true if the query was executed successfully (it can be assumed that the table exists afterwards), otherwise false on query error.
+		// Returns true, the table exists afterwards. Every SQLite3 error throws a RuntimeException.
 		public function table_add_ignore() : bool {
 
 			$sql = trim(<<<SQL
@@ -373,22 +396,40 @@
 				) STRICT;
 			SQL);
 
+			try {
+
+				$this->sqlite->exec( $sql );
+			}
+			catch( SQLite3Exception $e ) {
+
+				self::throw_rethrow_sqlite_error( $e );
+			}
+
 			/** @var bool */
-			return $this->sqlite->exec( $sql ) !== false;
+			return true;
 		}
 
 
 
 		// Drops the table if it exists.
-		// Returns true if the query was executed successfully (it can be assumed that the table does not exist afterwards), otherwise false on query error.
+		// Returns true, the table does not exist afterwards. Every SQLite3 error throws a RuntimeException.
 		public function table_delete_ignore() : bool {
 
 			$sql = trim(<<<SQL
 				DROP TABLE IF EXISTS "{$this->tblnam}";
 			SQL);
 
+			try {
+
+				$this->sqlite->exec( $sql );
+			}
+			catch( SQLite3Exception $e ) {
+
+				self::throw_rethrow_sqlite_error( $e );
+			}
+
 			/** @var bool */
-			return $this->sqlite->exec( $sql ) !== false;
+			return true;
 		}
 	}
 
@@ -428,45 +469,67 @@
 
 
 		// Adds columns to the table if they do not already exist.
-		// Returns true if the query was executed successfully (it can be assumed that the columns were processed afterwards), otherwise false on query error.
+		// Returns true, all columns exist afterwards. Every other SQLite3 error throws a RuntimeException.
+		// The ALTER TABLE runs for every column without a check before (SQLite has no ADD COLUMN IF NOT EXISTS). "duplicate column name" counts as success,
+		// also if another process adds the same column at the same time. A failing ALTER TABLE does not wait for the write lock.
 		public function columns_add_ignore( string ...$columnNames ) : bool {
-
-			$sql = '';
 
 			foreach( $columnNames as $columnName ) {
 
-				if( !$this->column_exists( $columnName ) ) {
+				self::validate_sqlite_name_guard_clause( $columnName );
 
-					$sql .= trim(<<<SQL
-						ALTER TABLE "{$this->tblnam}" ADD COLUMN "{$columnName}" ANY;
-					SQL);
+				$sql = trim(<<<SQL
+					ALTER TABLE "{$this->tblnam}" ADD COLUMN "{$columnName}" ANY;
+				SQL);
+
+				try {
+
+					$this->sqlite->exec( $sql );
+				}
+				catch( SQLite3Exception $e ) {
+
+					if( !str_contains( $e->getMessage(), 'duplicate column name' ) ) {
+
+						self::throw_rethrow_sqlite_error( $e );
+					}
 				}
 			}
 
 			/** @var bool */
-			return empty( $sql ) ? true : ( $this->sqlite->exec( $sql ) !== false );
+			return true;
 		}
 
 
 
 		// Removes columns from the table if they exist.
-		// Returns true if the query was executed successfully (it can be assumed that the columns were processed afterwards), otherwise false on query error.
+		// Returns true, none of the columns exists afterwards. Every other SQLite3 error throws a RuntimeException.
+		// The ALTER TABLE runs for every column without a check before (SQLite has no DROP COLUMN IF EXISTS). "no such column" counts as success,
+		// also if another process removes the same column at the same time. A failing ALTER TABLE does not wait for the write lock.
 		public function columns_delete_ignore( string ...$columnNames ) : bool {
-
-			$sql = '';
 
 			foreach( $columnNames as $columnName ) {
 
-				if( $this->column_exists( $columnName ) ) {
+				self::validate_sqlite_name_guard_clause( $columnName );
 
-					$sql .= trim(<<<SQL
-						ALTER TABLE "{$this->tblnam}" DROP COLUMN "{$columnName}";
-					SQL);
+				$sql = trim(<<<SQL
+					ALTER TABLE "{$this->tblnam}" DROP COLUMN "{$columnName}";
+				SQL);
+
+				try {
+
+					$this->sqlite->exec( $sql );
+				}
+				catch( SQLite3Exception $e ) {
+
+					if( !str_contains( $e->getMessage(), 'no such column' ) ) {
+
+						self::throw_rethrow_sqlite_error( $e );
+					}
 				}
 			}
 
 			/** @var bool */
-			return empty( $sql ) ? true : ( $this->sqlite->exec( $sql ) !== false );
+			return true;
 		}
 	}
 
@@ -707,22 +770,30 @@
 					PRAGMA table_info("{$this->tblnam}");
 				SQL);
 
-				if( ( $result = $this->sqlite->query( $sql ) ) !== false ) {
+				// Every SQLite3 error (querying and reading the rows) is passed on as a RuntimeException.
+				try {
 
-					try {
+					if( ( $result = $this->sqlite->query( $sql ) ) !== false ) {
 
-						while( ( $col = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
+						try {
 
-							if( isset( $col['name'] ) ) {
+							while( ( $col = $result->fetchArray( SQLITE3_ASSOC ) ) !== false ) {
 
-								$columnNames[] = $col['name'];
+								if( isset( $col['name'] ) ) {
+
+									$columnNames[] = $col['name'];
+								}
 							}
 						}
-					}
-					finally {
+						finally {
 
-						$result->finalize();
+							$result->finalize();
+						}
 					}
+				}
+				catch( SQLite3Exception $e ) {
+
+					self::throw_rethrow_sqlite_error( $e );
 				}
 			}
 

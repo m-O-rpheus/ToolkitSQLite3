@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.4.1
+### Version 1.4.2
 
 ---
 
@@ -16,10 +16,6 @@ It provides a clean, predictable, and safe API for common database operations, i
 - No fixed data type definitions per column; instead, values use SQLite3-style dynamic typing.
 - Focus on a simple API, high performance, and protection against SQL injection.
 - SELECT queries with common predicates.
-
-## Requirements
-- PHP 8.1 or higher
-- SQLite3 extension enabled (SQLite3 ≥ 3.37)
 
 ## Installation
 Include the class file:
@@ -473,6 +469,12 @@ This toolkit is designed to be predictable, readable, and boring — in the best
 
 ---
 
+## Requirements
+- **PHP:** 8.3 or higher
+- **PHP extensions:** `sqlite3` with SQLite 3.37 or higher
+
+---
+
 ## Attribution / License Notice
 This repository is licensed under the MIT License.
 
@@ -491,6 +493,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.4.2 Changelog:
+- Breaking change: README: the minimum requirement is PHP 8.3 (before: 8.1). New section "Requirements" (PHP, PHP extensions, PHP settings, browser, repositories, other requirements), structured the same in all repositories.
 
 #### Version 1.4.1 Changelog:
 - Code style: the README examples are indented with tabs instead of four spaces. No functional changes.

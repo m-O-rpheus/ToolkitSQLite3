@@ -338,7 +338,7 @@
 
 
 		// Checks whether the table exists in the database.
-		// Returns true if the table exists, otherwise false.
+		// Returns true if the table exists, otherwise false. A failing query throws a RuntimeException.
 		public function table_exists() : bool {
 
 			$bindings = [':table' => $this->tblnam];
@@ -403,7 +403,7 @@
 
 
 		// Checks whether a column exists in the current table.
-		// Returns true if the column exists, otherwise false.
+		// Returns true if the column exists, otherwise false. A failing query throws a RuntimeException.
 		public function column_exists( string $columnName ) : bool {
 
 			self::validate_sqlite_name_guard_clause( $columnName );
@@ -481,7 +481,7 @@
 
 
 		// Checks if a row exists in the table using its slug value.
-		// Returns true if the row exists, otherwise false.
+		// Returns true if the row exists, otherwise false. A failing query throws a RuntimeException.
 		public function row_isset( string $rowSlug ) : bool {
 
 			self::validate_row_slug_guard_clause( $rowSlug );
@@ -507,7 +507,7 @@
 
 		// Inserts a new row or updates an existing row based on the slug value.
 		// All values are safely bound using prepared statements and column names are validated at runtime.
-		// Returns true if the query executed successfully (insert or update), false on query error.
+		// Returns true if the query executed successfully (insert or update). A failing query throws a RuntimeException.
 		public function row_upsert( string $rowSlug, array $columnNameValuePair ) : bool {
 
 			self::validate_row_slug_guard_clause( $rowSlug );
@@ -551,7 +551,7 @@
 
 
 		// Removes a row from the table using its slug value.
-		// Returns true if a row was deleted, or false if no matching row existed or the deletion failed.
+		// Returns true if a row was deleted, or false if no matching row existed. A failing query throws a RuntimeException.
 		public function row_remove( string $rowSlug ) : bool {
 
 			self::validate_row_slug_guard_clause( $rowSlug );
@@ -586,6 +586,7 @@
 
 		// Builds the SELECT query and executes it using a prepared statement.
 		// Two internal helper properties are used within this method and its helpers to manage query state.
+		// Returns the found rows as an array. A failing query throws a RuntimeException.
 		private array $selectReserved;
 		private array $selectBindings;
 

@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.3.5
+### Version 1.3.6
 
 ---
 
@@ -25,7 +25,6 @@ It provides a clean, predictable, and safe API for common database operations, i
 Include the class file:
 ```php
 require 'ToolkitSQLite3.php';
-// Last check 06.05.2026
 ```
 
 ## Basic Usage
@@ -33,7 +32,6 @@ Table names must start with a lowercase letter and may only contain lowercase le
 
 ```php
 $db = new ToolkitSQLite3( 'database.sqlite3', 'example_table' );
-// Last check 06.05.2026
 ```
 
 ## Table Handling
@@ -45,7 +43,6 @@ if( $db->table_exists() ) {
 else {
     echo 'Table does not exist';
 }
-// Last check 11.05.2026
 ```
 
 ### Create a table (ignored if it already exists)
@@ -56,7 +53,6 @@ if( $db->table_add_ignore() ) {
 else {
     echo 'Query error';
 }
-// Last check 11.05.2026
 ```
 
 ### Delete a table (ignored if it does not exist)
@@ -67,7 +63,6 @@ if( $db->table_delete_ignore() ) {
 else {
     echo 'Query error';
 }
-// Last check 11.05.2026
 ```
 
 ## Column Handling
@@ -81,7 +76,6 @@ if( $db->column_exists( 'title' ) ) {
 else {
     echo 'Column does not exist';
 }
-// Last check 11.05.2026
 ```
 
 ### Add columns (ignored if they already exist)
@@ -92,7 +86,6 @@ if( $db->columns_add_ignore( 'title', 'views', 'payload', 'float' ) ) {
 else {
     echo 'Query error';
 }
-// Last check 11.05.2026
 ```
 
 ### Delete columns (ignored if they do not exist)
@@ -103,7 +96,6 @@ if( $db->columns_delete_ignore( 'title', 'views', 'payload', 'float' ) ) {
 else {
     echo 'Query error';
 }
-// Last check 11.05.2026
 ```
 
 ## Row Handling
@@ -117,7 +109,6 @@ if( $db->row_isset( 'post_1' ) ) {
 else {
     echo 'Row does not exist';
 }
-// Last check 11.05.2026
 ```
 
 ### Insert or update a row (UPSERT)
@@ -127,7 +118,7 @@ Behavior
 - _created_at is set only on initial insert.
 - _updated_at is set on both insert and update operations.
 
-The provided column-value pairs determine which columns are created or updated. Column names must be strings and must already exist in the database schema.
+The provided column-value pairs determine which columns are written. Column names must be strings and must already exist in the database schema (add them with `columns_add_ignore()`). A failing query throws a `RuntimeException`, so `row_upsert()` returns `true` or throws.
 The following PHP data types are supported and internally mapped to SQLite’s dynamic typing system:
 - `null` → `SQLITE3_NULL`
 - `string` → `SQLITE3_TEXT`
@@ -143,10 +134,6 @@ $row = ['title' => 'Hello World 1', 'views' => 42];
 if( $db->row_upsert( 'post_1', $row ) ) {
     echo 'Query was executed successfully';
 }
-else {
-    echo 'Query error';
-}
-// Last check 11.05.2026
 ```
 
 ### UPSERT using loops
@@ -162,17 +149,17 @@ foreach( $rows as $row ) {
     if( $db->row_upsert( 'post_1', $row ) ) {
         echo 'Query was executed successfully';
     }
-    else {
-        echo 'Query error';
-    }
 }
-// Last check 11.05.2026
 ```
 
 ### Remove a row
 ```php
-$db->row_remove( 'post_1' );
-// Last check 01.01.2026
+if( $db->row_remove( 'post_1' ) ) {
+    echo 'Row was removed';
+}
+else {
+    echo 'No matching row';
+}
 ```
 
 ## SELECT Queries
@@ -195,7 +182,6 @@ If no arguments are provided:
 - no filtering is applied
 ```php
 $result = $db->select( [] );
-// Last check 12.05.2026
 ```
 
 ### Selecting Specific Columns
@@ -204,7 +190,6 @@ Use the columns argument to limit the selected columns.
 $result = $db->select( [
     'columns' => ['title', 'views']
 ] );
-// Last check 12.05.2026
 ```
 
 ### DISTINCT
@@ -214,7 +199,6 @@ $result = $db->select( [
     'distinct' => true,
     'columns'  => ['title']
 ] );
-// Last check 12.05.2026
 ```
 
 ### ORDER BY
@@ -226,7 +210,6 @@ $result = $db->select( [
         'title' => 'ASC'
     ]
 ] );
-// Last check 12.05.2026
 ```
 
 ### LIMIT
@@ -235,7 +218,6 @@ Restricts the maximum number of rows returned by the query.
 $result = $db->select( [
     'limit' => 10
 ] );
-// Last check 12.05.2026
 ```
 
 ### OFFSET
@@ -244,7 +226,6 @@ Defines the number of rows to skip before returning results.
 $result = $db->select( [
     'offset' => 20
 ] );
-// Last check 12.05.2026
 ```
 
 ### WHERE
@@ -258,7 +239,6 @@ $result = $db->select( [
         'value'  => 100
     ]
 ] );
-// Last check 12.05.2026
 ```
 
 #### Membership predicate (IN)
@@ -270,7 +250,6 @@ $result = $db->select( [
         'values' => ['open', 'closed']
     ]
 ] );
-// Last check 12.05.2026
 ```
 
 #### Range predicate (BETWEEN)
@@ -283,7 +262,6 @@ $result = $db->select( [
         'max'    => 100
     ]
 ] );
-// Last check 12.05.2026
 ```
 
 #### Null predicate (IS NULL)
@@ -294,7 +272,6 @@ $result = $db->select( [
         'op'     => 'IS NULL'
     ]
 ] );
-// Last check 12.05.2026
 ```
 
 #### AND conditions
@@ -315,7 +292,6 @@ $result = $db->select( [
         ]
     ]
 ] );
-// Last check 12.05.2026
 ```
 
 #### OR conditions
@@ -336,7 +312,6 @@ $result = $db->select( [
         ]
     ]
 ] );
-// Last check 12.05.2026
 ```
 
 #### NOT conditions
@@ -350,7 +325,6 @@ $result = $db->select( [
         ]
     ]
 ] );
-// Last check 12.05.2026
 ```
 
 #### Nested Logical Trees
@@ -381,7 +355,6 @@ $result = $db->select( [
         ]
     ]
 ] );
-// Last check 12.05.2026
 ```
 
 ## Combining Multiple Query Components
@@ -412,13 +385,12 @@ $result = $db->select( [
     'limit'  => 25,
     'offset' => 0
 ] );
-// Last check 12.05.2026
 ```
 
 ## Concurrent Access
 Several processes (e.g. parallel requests) can use the same database file. Two protected constants control the behavior and can be changed via class extension (late static binding):
 - `BUSY_TIMEOUT` (default `10000`): milliseconds to wait for the lock of another process before an operation fails with "database is locked".
-- `JOURNAL_MODE` (default `'WAL'`): with Write-Ahead Logging, readers do not block writers and vice versa. SQLite3 creates the files `*-wal` and `*-shm` next to the database file, so the folder must be writable. WAL does not work on network file systems, use e.g. `'DELETE'` there.
+- `JOURNAL_MODE` (default `'WAL'`): with Write-Ahead Logging, readers do not block writers and vice versa. SQLite3 creates the files `*-wal` and `*-shm` next to the database file, so the folder must be writable. WAL does not work on network file systems, use e.g. `'DELETE'` there. The journal mode is stored permanently in the database file, so the constructor writes it only if it differs from the current mode (changing it does not use the busy timeout).
 
 ```php
 class ToolkitSQLite3Slow extends ToolkitSQLite3 {
@@ -490,6 +462,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.3.6 Changelog:
+- Comments and README: `row_upsert()` and `row_remove()` never return `false` on a failing query, `consume_query()` throws a `RuntimeException` ("false on query error" and "or the deletion failed" were wrong). The comments of all methods that use `consume_query()` (`table_exists()`, `column_exists()`, `row_isset()`, `row_upsert()`, `row_remove()`, `select()`) mention it. The examples of `row_upsert()` no longer show an unreachable `else { echo 'Query error'; }`. `row_upsert()` does not create columns ("created or updated" was wrong). The section "Concurrent Access" explains that the journal mode is written only if it differs. The example of `row_remove()` shows the return value (`true` if a row was removed, `false` if no matching row existed). The comments "// Last check …" are removed from the examples. No functional changes.
 
 #### Version 1.3.5 Changelog:
 - Breaking change: table and column names must start with a lowercase letter and contain only lowercase letters, digits or underscores (before: also uppercase letters), otherwise a `RuntimeException` is thrown. SQLite3 compares names case-insensitively, so `B` and `b` are the same column: e.g. `columns_delete_ignore( 'B' )` checked `column_exists( 'B' )` case-sensitively. Callers with uppercase names must use lowercase names, existing databases with uppercase table or column names must be created again.

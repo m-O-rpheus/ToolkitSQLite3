@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.4.3
+### Version 1.4.4
 
 ---
 
@@ -85,14 +85,14 @@ else {
 
 ### Add columns (ignored if they already exist)
 ```php
-if( $db->columns_add_ignore( 'title', 'views', 'payload', 'float' ) ) {
+if( $db->columns_add_ignore( 'title', 'views', 'status', 'payload', 'float' ) ) {
 	echo 'Query was executed successfully';
 }
 ```
 
 ### Delete columns (ignored if they do not exist)
 ```php
-if( $db->columns_delete_ignore( 'title', 'views', 'payload', 'float' ) ) {
+if( $db->columns_delete_ignore( 'title', 'views', 'status', 'payload', 'float' ) ) {
 	echo 'Query was executed successfully';
 }
 ```
@@ -130,7 +130,7 @@ Other types (e.g. `bool` or objects) throw a `RuntimeException` ("Unsupported da
 
 Both resource values and array values share the same SQLite storage class (BLOB). To disambiguate these two logically different data types, arrays are serialized into JSON before storage and are prefixed with a dedicated alias marker. This alias ensures that JSON-encoded payloads can be reliably distinguished from raw binary stream data when reading from the database.
 ```php
-$row = ['title' => 'Hello World 1', 'views' => 42];
+$row = ['title' => 'Hello World 1', 'views' => 42, 'status' => 'active'];
 
 if( $db->row_upsert( 'post_1', $row ) ) {
 	echo 'Query was executed successfully';
@@ -140,9 +140,9 @@ if( $db->row_upsert( 'post_1', $row ) ) {
 ### UPSERT using loops
 ```php
 $rows = [
-	'post_1' => ['title' => 'Hello World 1', 'views' => 42],
-	'post_2' => ['title' => 'Hello World 2', 'views' => 7],
-	'post_3' => ['title' => 'Hello World 3', 'views' => 0],
+	'post_1' => ['title' => 'Hello World 1', 'views' => 42, 'status' => 'active'],
+	'post_2' => ['title' => 'Hello World 2', 'views' => 7, 'status' => 'pending'],
+	'post_3' => ['title' => 'Hello World 3', 'views' => 150, 'status' => 'closed'],
 ];
 
 foreach( $rows as $slug => $row ) {
@@ -415,6 +415,8 @@ Several processes (e.g. parallel requests) can use the same database file. Two p
 - `BUSY_TIMEOUT` (default `10000`): milliseconds to wait for the lock of another process before an operation fails with "database is locked".
 - `JOURNAL_MODE` (default `'WAL'`): with Write-Ahead Logging, readers do not block writers and vice versa. SQLite3 creates the files `*-wal` and `*-shm` next to the database file, so the folder must be writable. WAL does not work on network file systems, use e.g. `'DELETE'` there. The journal mode is stored permanently in the database file, so the constructor writes it only if it differs from the current mode (changing it does not use the busy timeout).
 
+The journal mode is stored permanently in the database file and can only be changed while no other connection has the file open. Change `JOURNAL_MODE` for a new database, otherwise the constructor throws "database is locked".
+
 ```php
 class ToolkitSQLite3New extends ToolkitSQLite3 {
 
@@ -493,6 +495,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.4.4 Changelog:
+- README: the examples create and fill the column `status` that the WHERE examples use (before: "no such column: status"), the third row has 150 views, so that the examples with `>= 100` find a row. The section "Concurrent Access" notes that the journal mode can only be changed while no other connection has the database file open. No functional changes.
 
 #### Version 1.4.3 Changelog:
 - README: the class extension in the example is named `ToolkitSQLite3New` instead of `ToolkitSQLite3Slow`. No functional changes.

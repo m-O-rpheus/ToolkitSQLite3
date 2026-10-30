@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.4.0
+### Version 1.4.1
 
 ---
 
@@ -41,11 +41,11 @@ All errors throw a `RuntimeException`: invalid names or values, and every SQLite
 
 ```php
 try {
-    $db->table_add_ignore();
-    $db->columns_add_ignore( 'title', 'views' );
+	$db->table_add_ignore();
+	$db->columns_add_ignore( 'title', 'views' );
 }
 catch( RuntimeException $e ) {
-    echo 'Error: ' . $e->getMessage(); // The original SQLite3Exception is available via $e->getPrevious().
+	echo 'Error: ' . $e->getMessage(); // The original SQLite3Exception is available via $e->getPrevious().
 }
 ```
 
@@ -53,24 +53,24 @@ catch( RuntimeException $e ) {
 ### Check if a table exists
 ```php
 if( $db->table_exists() ) {
-    echo 'Table exists';
+	echo 'Table exists';
 }
 else {
-    echo 'Table does not exist';
+	echo 'Table does not exist';
 }
 ```
 
 ### Create a table (ignored if it already exists)
 ```php
 if( $db->table_add_ignore() ) {
-    echo 'Query was executed successfully';
+	echo 'Query was executed successfully';
 }
 ```
 
 ### Delete a table (ignored if it does not exist)
 ```php
 if( $db->table_delete_ignore() ) {
-    echo 'Query was executed successfully';
+	echo 'Query was executed successfully';
 }
 ```
 
@@ -80,24 +80,24 @@ Column names must start with a lowercase letter and may only contain lowercase l
 ### Check if a column exists
 ```php
 if( $db->column_exists( 'title' ) ) {
-    echo 'Column exists';
+	echo 'Column exists';
 }
 else {
-    echo 'Column does not exist';
+	echo 'Column does not exist';
 }
 ```
 
 ### Add columns (ignored if they already exist)
 ```php
 if( $db->columns_add_ignore( 'title', 'views', 'payload', 'float' ) ) {
-    echo 'Query was executed successfully';
+	echo 'Query was executed successfully';
 }
 ```
 
 ### Delete columns (ignored if they do not exist)
 ```php
 if( $db->columns_delete_ignore( 'title', 'views', 'payload', 'float' ) ) {
-    echo 'Query was executed successfully';
+	echo 'Query was executed successfully';
 }
 ```
 
@@ -107,10 +107,10 @@ Each row is uniquely identified by its _slug value. This field is internally man
 ### Check if a row exists
 ```php
 if( $db->row_isset( 'post_1' ) ) {
-    echo 'Row exists';
+	echo 'Row exists';
 }
 else {
-    echo 'Row does not exist';
+	echo 'Row does not exist';
 }
 ```
 
@@ -137,33 +137,33 @@ Both resource values and array values share the same SQLite storage class (BLOB)
 $row = ['title' => 'Hello World 1', 'views' => 42];
 
 if( $db->row_upsert( 'post_1', $row ) ) {
-    echo 'Query was executed successfully';
+	echo 'Query was executed successfully';
 }
 ```
 
 ### UPSERT using loops
 ```php
 $rows = [
-    'post_1' => ['title' => 'Hello World 1', 'views' => 42],
-    'post_2' => ['title' => 'Hello World 2', 'views' => 7],
-    'post_3' => ['title' => 'Hello World 3', 'views' => 0],
+	'post_1' => ['title' => 'Hello World 1', 'views' => 42],
+	'post_2' => ['title' => 'Hello World 2', 'views' => 7],
+	'post_3' => ['title' => 'Hello World 3', 'views' => 0],
 ];
 
 foreach( $rows as $slug => $row ) {
 
-    if( $db->row_upsert( $slug, $row ) ) {
-        echo 'Query was executed successfully';
-    }
+	if( $db->row_upsert( $slug, $row ) ) {
+		echo 'Query was executed successfully';
+	}
 }
 ```
 
 ### Remove a row
 ```php
 if( $db->row_remove( 'post_1' ) ) {
-    echo 'Row was removed';
+	echo 'Row was removed';
 }
 else {
-    echo 'No matching row';
+	echo 'No matching row';
 }
 ```
 
@@ -176,12 +176,12 @@ Binary data is stored and read as a stream resource. Two static conversion helpe
 $blob = ToolkitSQLite3::string_to_resource( file_get_contents( 'image.avif' ) );
 
 if( $blob !== false ) {
-    $db->row_upsert( 'image_1', ['payload' => $blob] );
+	$db->row_upsert( 'image_1', ['payload' => $blob] );
 }
 
 $rows = $db->select( [
-    'columns' => ['payload'],
-    'where'   => ['column' => '_slug', 'op' => '=', 'value' => 'image_1']
+	'columns' => ['payload'],
+	'where'   => ['column' => '_slug', 'op' => '=', 'value' => 'image_1']
 ] );
 
 $data = ToolkitSQLite3::resource_to_string( $rows[0]['payload'] ); // The binary string, or false on failure.
@@ -215,7 +215,7 @@ $result = $db->select( [] );
 Use the columns argument to limit the selected columns.
 ```php
 $result = $db->select( [
-    'columns' => ['title', 'views']
+	'columns' => ['title', 'views']
 ] );
 ```
 
@@ -223,8 +223,8 @@ $result = $db->select( [
 Removes duplicate rows from the result set.
 ```php
 $result = $db->select( [
-    'distinct' => true,
-    'columns'  => ['title']
+	'distinct' => true,
+	'columns'  => ['title']
 ] );
 ```
 
@@ -232,10 +232,10 @@ $result = $db->select( [
 Defines the result ordering based on one or more columns with ASC or DESC direction.
 ```php
 $result = $db->select( [
-    'orderby' => [
-        'views' => 'DESC',
-        'title' => 'ASC'
-    ]
+	'orderby' => [
+		'views' => 'DESC',
+		'title' => 'ASC'
+	]
 ] );
 ```
 
@@ -243,7 +243,7 @@ $result = $db->select( [
 Restricts the maximum number of rows returned by the query. The value must be an `int` (like `offset`), other values are ignored.
 ```php
 $result = $db->select( [
-    'limit' => 10
+	'limit' => 10
 ] );
 ```
 
@@ -251,7 +251,7 @@ $result = $db->select( [
 Defines the number of rows to skip before returning results.
 ```php
 $result = $db->select( [
-    'offset' => 20
+	'offset' => 20
 ] );
 ```
 
@@ -260,97 +260,97 @@ The where argument accepts a structured logical expression tree. A leaf that is 
 #### Binary predicate (=, !=, <, <=, >, >=, LIKE, GLOB)
 ```php
 $result = $db->select( [
-    'where' => [
-        'column' => 'views',
-        'op'     => '>=',
-        'value'  => 100
-    ]
+	'where' => [
+		'column' => 'views',
+		'op'     => '>=',
+		'value'  => 100
+	]
 ] );
 ```
 
 #### Membership predicate (IN)
 ```php
 $result = $db->select( [
-    'where' => [
-        'column' => 'status',
-        'op'     => 'IN',
-        'values' => ['open', 'closed']
-    ]
+	'where' => [
+		'column' => 'status',
+		'op'     => 'IN',
+		'values' => ['open', 'closed']
+	]
 ] );
 ```
 
 #### Range predicate (BETWEEN)
 ```php
 $result = $db->select( [
-    'where' => [
-        'column' => 'views',
-        'op'     => 'BETWEEN',
-        'min'    => 10,
-        'max'    => 100
-    ]
+	'where' => [
+		'column' => 'views',
+		'op'     => 'BETWEEN',
+		'min'    => 10,
+		'max'    => 100
+	]
 ] );
 ```
 
 #### Null predicate (IS NULL)
 ```php
 $result = $db->select( [
-    'where' => [
-        'column' => 'payload',
-        'op'     => 'IS NULL'
-    ]
+	'where' => [
+		'column' => 'payload',
+		'op'     => 'IS NULL'
+	]
 ] );
 ```
 
 #### AND conditions
 ```php
 $result = $db->select( [
-    'where' => [
-        'AND' => [
-            [
-                'column' => 'views',
-                'op'     => '>=',
-                'value'  => 10
-            ],
-            [
-                'column' => 'status',
-                'op'     => '=',
-                'value'  => 'active'
-            ]
-        ]
-    ]
+	'where' => [
+		'AND' => [
+			[
+				'column' => 'views',
+				'op'     => '>=',
+				'value'  => 10
+			],
+			[
+				'column' => 'status',
+				'op'     => '=',
+				'value'  => 'active'
+			]
+		]
+	]
 ] );
 ```
 
 #### OR conditions
 ```php
 $result = $db->select( [
-    'where' => [
-        'OR' => [
-            [
-                'column' => 'status',
-                'op'     => '=',
-                'value'  => 'active'
-            ],
-            [
-                'column' => 'status',
-                'op'     => '=',
-                'value'  => 'pending'
-            ]
-        ]
-    ]
+	'where' => [
+		'OR' => [
+			[
+				'column' => 'status',
+				'op'     => '=',
+				'value'  => 'active'
+			],
+			[
+				'column' => 'status',
+				'op'     => '=',
+				'value'  => 'pending'
+			]
+		]
+	]
 ] );
 ```
 
 #### NOT conditions
 ```php
 $result = $db->select( [
-    'where' => [
-        'NOT' => [
-            'column' => 'status',
-            'op'     => '=',
-            'value'  => 'deleted'
-        ]
-    ]
+	'where' => [
+		'NOT' => [
+			'column' => 'status',
+			'op'     => '=',
+			'value'  => 'deleted'
+		]
+	]
 ] );
 ```
 
@@ -358,59 +358,59 @@ $result = $db->select( [
 Complex logical structures can be nested arbitrarily.
 ```php
 $result = $db->select( [
-    'where' => [
-        'AND' => [
-            [
-                'column' => 'views',
-                'op'     => '>=',
-                'value'  => 100
-            ],
-            [
-                'OR' => [
-                    [
-                        'column' => 'status',
-                        'op'     => '=',
-                        'value'  => 'active'
-                    ],
-                    [
-                        'column' => 'status',
-                        'op'     => '=',
-                        'value'  => 'pending'
-                    ]
-                ]
-            ]
-        ]
-    ]
+	'where' => [
+		'AND' => [
+			[
+				'column' => 'views',
+				'op'     => '>=',
+				'value'  => 100
+			],
+			[
+				'OR' => [
+					[
+						'column' => 'status',
+						'op'     => '=',
+						'value'  => 'active'
+					],
+					[
+						'column' => 'status',
+						'op'     => '=',
+						'value'  => 'pending'
+					]
+				]
+			]
+		]
+	]
 ] );
 ```
 
 ## Combining Multiple Query Components
 ```php
 $result = $db->select( [
-    'distinct' => true,
-    'columns' => [
-        'title',
-        'views'
-    ],
-    'where' => [
-        'AND' => [
-            [
-                'column' => 'views',
-                'op'     => '>=',
-                'value'  => 10
-            ],
-            [
-                'column' => 'status',
-                'op'     => '=',
-                'value'  => 'active'
-            ]
-        ]
-    ],
-    'orderby' => [
-        'views' => 'DESC'
-    ],
-    'limit'  => 25,
-    'offset' => 0
+	'distinct' => true,
+	'columns' => [
+		'title',
+		'views'
+	],
+	'where' => [
+		'AND' => [
+			[
+				'column' => 'views',
+				'op'     => '>=',
+				'value'  => 10
+			],
+			[
+				'column' => 'status',
+				'op'     => '=',
+				'value'  => 'active'
+			]
+		]
+	],
+	'orderby' => [
+		'views' => 'DESC'
+	],
+	'limit'  => 25,
+	'offset' => 0
 ] );
 ```
 
@@ -422,8 +422,8 @@ Several processes (e.g. parallel requests) can use the same database file. Two p
 ```php
 class ToolkitSQLite3Slow extends ToolkitSQLite3 {
 
-    protected const BUSY_TIMEOUT = 20000;
-    protected const JOURNAL_MODE = 'DELETE';
+	protected const BUSY_TIMEOUT = 20000;
+	protected const JOURNAL_MODE = 'DELETE';
 }
 
 $db = new ToolkitSQLite3Slow( 'database.sqlite3', 'example_table' );
@@ -491,6 +491,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.4.1 Changelog:
+- Code style: the README examples are indented with tabs instead of four spaces. No functional changes.
 
 #### Version 1.4.0 Changelog:
 - Comments: the constructor and the destructor have a description, `resource_to_string()` and `string_to_resource()` describe their return value (`false` on failure), `consume_query()` and `select_buildWhere__renderLeafNode()` mention the `RuntimeException`.

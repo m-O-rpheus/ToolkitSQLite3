@@ -394,10 +394,10 @@
 
 			$sql = trim(<<<SQL
 				CREATE TABLE IF NOT EXISTS "{$this->tblnam}" (
-					_id INTEGER PRIMARY KEY AUTOINCREMENT,
-					_slug TEXT NOT NULL UNIQUE,
-					_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+					"_id" INTEGER PRIMARY KEY AUTOINCREMENT,
+					"_slug" TEXT NOT NULL UNIQUE,
+					"_created_at" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					"_updated_at" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 				) STRICT;
 			SQL);
 
@@ -557,7 +557,7 @@
 			$bindings = [':slug' => $rowSlug];
 
 			$sql = trim(<<<SQL
-				SELECT 1 FROM "{$this->tblnam}" WHERE _slug=:slug LIMIT 1;
+				SELECT 1 FROM "{$this->tblnam}" WHERE "_slug"=:slug LIMIT 1;
 			SQL);
 
 			$fnResult = false;
@@ -580,9 +580,9 @@
 
 			static::validate_row_slug_guard_clause( $rowSlug );
 
-			$columns  = ['_slug'];
+			$columns  = ['"_slug"'];
 			$params   = [':slug'];
-			$clauses  = ['_updated_at=CURRENT_TIMESTAMP'];
+			$clauses  = ['"_updated_at"=CURRENT_TIMESTAMP'];
 			$bindings = [':slug' => $rowSlug];
 
 			foreach( $columnNameValuePair as $columnName => $columnValue ) {
@@ -602,7 +602,7 @@
 			$clauses = implode( ', ', $clauses );
 
 			$sql = trim(<<<SQL
-				INSERT INTO "{$this->tblnam}" ({$columns}) VALUES ({$params}) ON CONFLICT(_slug) DO UPDATE SET {$clauses};
+				INSERT INTO "{$this->tblnam}" ({$columns}) VALUES ({$params}) ON CONFLICT("_slug") DO UPDATE SET {$clauses};
 			SQL);
 
 			$fnResult = false;
@@ -627,7 +627,7 @@
 			$bindings = [':slug' => $rowSlug];
 
 			$sql = trim(<<<SQL
-				DELETE FROM "{$this->tblnam}" WHERE _slug=:slug;
+				DELETE FROM "{$this->tblnam}" WHERE "_slug"=:slug;
 			SQL);
 
 			$fnResult = false;

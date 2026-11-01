@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.4.5
+### Version 1.4.6
 
 ---
 
@@ -43,6 +43,13 @@ try {
 catch( RuntimeException $e ) {
 	echo 'Error: ' . $e->getMessage(); // The original SQLite3Exception is available via $e->getPrevious().
 }
+```
+
+Names and row slugs can be checked in advance without a database connection. Both methods throw a `RuntimeException` for an invalid value:
+
+```php
+ToolkitSQLite3::validate_sqlite_name_guard_clause( 'title' );
+ToolkitSQLite3::validate_row_slug_guard_clause( 'first-entry' );
 ```
 
 ## Table Handling
@@ -513,6 +520,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.4.6 Changelog:
+- `validate_sqlite_name_guard_clause()` and `validate_row_slug_guard_clause()` are public, so that names and row slugs can be checked in advance. Both methods are final, so that the protection against SQL injection cannot be weakened via class extension.
 
 #### Version 1.4.5 Changelog:
 - README: the SELECT examples show the expected result in a comment. The example "UPSERT using loops" has a fourth row with the same title as the first one, so that DISTINCT and the combined example return a visible result, and `limit` and `offset` fit the four rows (before: `10` and `20`, which returned all rows or no row at all). No functional changes.

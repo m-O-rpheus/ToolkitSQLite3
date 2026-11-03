@@ -55,7 +55,7 @@
 		// The table is stored with the prefix TABLE_PREFIX (e.g. "toolkitsqlite3_example_table"). Every error throws a RuntimeException.
 		public function __construct( string $fileName, string $tableName ) {
 
-			static::validate_sqlite_name_guard_clause( $tableName );
+			self::validate_sqlite_name_guard_clause( $tableName );
 
 			// Every SQLite3 error (opening and configuring the database) is passed on as a RuntimeException.
 			try {
@@ -452,7 +452,7 @@
 		// Returns true if the column exists, otherwise false. A failing query throws a RuntimeException.
 		public function column_exists( string $columnName ) : bool {
 
-			static::validate_sqlite_name_guard_clause( $columnName );
+			self::validate_sqlite_name_guard_clause( $columnName );
 
 			$bindings = [':column' => $columnName];
 
@@ -481,7 +481,7 @@
 
 			foreach( $columnNames as $columnName ) {
 
-				static::validate_sqlite_name_guard_clause( $columnName );
+				self::validate_sqlite_name_guard_clause( $columnName );
 
 				$sql = trim(<<<SQL
 					ALTER TABLE "{$this->tblnam}" ADD COLUMN "{$columnName}" ANY;
@@ -514,7 +514,7 @@
 
 			foreach( $columnNames as $columnName ) {
 
-				static::validate_sqlite_name_guard_clause( $columnName );
+				self::validate_sqlite_name_guard_clause( $columnName );
 
 				$sql = trim(<<<SQL
 					ALTER TABLE "{$this->tblnam}" DROP COLUMN "{$columnName}";
@@ -552,7 +552,7 @@
 		// Returns true if the row exists, otherwise false. A failing query throws a RuntimeException.
 		public function row_isset( string $rowSlug ) : bool {
 
-			static::validate_row_slug_guard_clause( $rowSlug );
+			self::validate_row_slug_guard_clause( $rowSlug );
 
 			$bindings = [':slug' => $rowSlug];
 
@@ -578,7 +578,7 @@
 		// Returns true if the query executed successfully (insert or update). A failing query throws a RuntimeException.
 		public function row_upsert( string $rowSlug, array $columnNameValuePair ) : bool {
 
-			static::validate_row_slug_guard_clause( $rowSlug );
+			self::validate_row_slug_guard_clause( $rowSlug );
 
 			$columns  = ['"_slug"'];
 			$params   = [':slug'];
@@ -587,7 +587,7 @@
 
 			foreach( $columnNameValuePair as $columnName => $columnValue ) {
 
-				static::validate_sqlite_name_guard_clause( $columnName );
+				self::validate_sqlite_name_guard_clause( $columnName );
 
 				$token = $this->get_unique_token();
 
@@ -622,7 +622,7 @@
 		// Returns true if a row was deleted, or false if no matching row existed. A failing query throws a RuntimeException.
 		public function row_remove( string $rowSlug ) : bool {
 
-			static::validate_row_slug_guard_clause( $rowSlug );
+			self::validate_row_slug_guard_clause( $rowSlug );
 
 			$bindings = [':slug' => $rowSlug];
 
@@ -806,7 +806,7 @@
 
 				if( !in_array( $columnName, $this->selectReserved, true ) ) {
 
-					static::validate_sqlite_name_guard_clause( $columnName );
+					self::validate_sqlite_name_guard_clause( $columnName );
 				}
 
 				$columnParts[] = $columnName;
@@ -831,7 +831,7 @@
 
 				if( !in_array( $columnName, $this->selectReserved, true ) ) {
 
-					static::validate_sqlite_name_guard_clause( $columnName );
+					self::validate_sqlite_name_guard_clause( $columnName );
 				}
 
 				$sortParts[] = $columnName . ' ' . ( strtoupper( strval( $direction ) ) === 'DESC' ? 'DESC' : 'ASC' );
@@ -940,7 +940,7 @@
 
 				if( !in_array( $node['column'], $this->selectReserved, true ) ) {
 
-					static::validate_sqlite_name_guard_clause( $node['column'] );
+					self::validate_sqlite_name_guard_clause( $node['column'] );
 				}
 
 				// Register all specialized leaf predicate renderers.

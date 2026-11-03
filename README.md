@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.4.7
+### Version 1.4.8
 
 ---
 
@@ -520,6 +520,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.4.8 Changelog:
+- The `final` methods `validate_sqlite_name_guard_clause()` and `validate_row_slug_guard_clause()` are called with `self::` instead of `static::` (11 calls), as all members that cannot be overridden. No functional changes.
 
 #### Version 1.4.7 Changelog:
 - The built-in columns `_id`, `_slug`, `_created_at` and `_updated_at` are quoted in the SQL statements of the table and row methods. The behavior is unchanged.

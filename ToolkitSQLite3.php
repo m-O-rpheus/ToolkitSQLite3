@@ -203,7 +203,7 @@
 
 		final public static function validate_sqlite_name_guard_clause( string $name ) : void {
 
-			if( strlen( $name ) > static::MAX_LENGTH || preg_match( '/^[a-z][a-z0-9_]*$/', $name ) !== 1 ) {
+			if( strlen( $name ) > static::MAX_LENGTH || preg_match( '/^[a-z][a-z0-9_]*\z/', $name ) !== 1 ) {
 
 				self::throw_invalid_sqlite_name();
 			}

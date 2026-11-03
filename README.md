@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.4.8
+### Version 1.4.9
 
 ---
 
@@ -520,6 +520,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.4.9 Changelog:
+- `validate_sqlite_name_guard_clause()`: the regular expression ends with `\z` instead of `$`, so a table or column name with a line break at the end is rejected (before, `$` also matched before a final line break).
 
 #### Version 1.4.8 Changelog:
 - The `final` methods `validate_sqlite_name_guard_clause()` and `validate_row_slug_guard_clause()` are called with `self::` instead of `static::` (11 calls), as all members that cannot be overridden. No functional changes.

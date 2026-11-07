@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.4.9
+### Version 1.5.0
 
 ---
 
@@ -520,6 +520,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.5.0 Changelog:
+- `row_upsert()`: the column names in the column list of `INSERT` and in `SET` are quoted, so a column with the name of an SQLite keyword (e.g. `order`) can be written. A missing column still throws. `select()` (column list, ORDER BY, WHERE) does not quote the names yet.
 
 #### Version 1.4.9 Changelog:
 - `validate_sqlite_name_guard_clause()`: the regular expression ends with `\z` instead of `$`, so a table or column name with a line break at the end is rejected (before, `$` also matched before a final line break).

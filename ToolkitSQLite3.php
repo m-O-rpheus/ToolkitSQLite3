@@ -591,9 +591,9 @@
 
 				$token = $this->get_unique_token();
 
-				$columns[]        = $columnName;
+				$columns[]        = '"' . $columnName . '"';
 				$params[]         = $token;
-				$clauses[]        = $columnName . '=' . $token;
+				$clauses[]        = '"' . $columnName . '"=' . $token;
 				$bindings[$token] = $columnValue;
 			}
 
@@ -602,7 +602,7 @@
 			$clauses = implode( ', ', $clauses );
 
 			$sql = trim(<<<SQL
-				INSERT INTO "{$this->tblnam}" ({$columns}) VALUES ({$params}) ON CONFLICT("_slug") DO UPDATE SET {$clauses};
+				INSERT INTO "{$this->tblnam}" ({$columns}) VALUES ({$params}) ON CONFLICT ("_slug") DO UPDATE SET {$clauses};
 			SQL);
 
 			$fnResult = false;

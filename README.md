@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.5.1
+### Version 1.5.2
 
 ---
 
@@ -520,6 +520,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.5.2 Changelog:
+- `select()`: ORDER BY uses fully qualified column names (`"table"."column"`). A column with the name of an SQLite keyword (e.g. `order`) can be used in ORDER BY, a missing column always throws ("no such column: table.column"). Otherwise the behavior is unchanged. The column list of `select()` does not quote the names yet.
 
 #### Version 1.5.1 Changelog:
 - `select()` (the four WHERE predicates), `row_isset()` and `row_remove()` use fully qualified column names (`"table"."column"`) in WHERE. A column with the name of an SQLite keyword (e.g. `order`) can be used in WHERE, a missing column always throws ("no such column: table.column"). Otherwise the behavior is unchanged. The column list and ORDER BY of `select()` do not quote the names yet.

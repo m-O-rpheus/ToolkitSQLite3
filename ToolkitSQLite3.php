@@ -834,7 +834,7 @@
 					self::validate_sqlite_name_guard_clause( $columnName );
 				}
 
-				$sortParts[] = $columnName . ' ' . ( strtoupper( strval( $direction ) ) === 'DESC' ? 'DESC' : 'ASC' );
+				$sortParts[] = '"' . $this->tblnam . '"."' . $columnName . '" ' . ( strtoupper( strval( $direction ) ) === 'DESC' ? 'DESC' : 'ASC' );
 			}
 
 			/** @var string */

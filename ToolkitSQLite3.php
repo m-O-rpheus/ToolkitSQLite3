@@ -557,7 +557,7 @@
 			$bindings = [':slug' => $rowSlug];
 
 			$sql = trim(<<<SQL
-				SELECT 1 FROM "{$this->tblnam}" WHERE "_slug"=:slug LIMIT 1;
+				SELECT 1 FROM "{$this->tblnam}" WHERE "{$this->tblnam}"."_slug"=:slug LIMIT 1;
 			SQL);
 
 			$fnResult = false;
@@ -627,7 +627,7 @@
 			$bindings = [':slug' => $rowSlug];
 
 			$sql = trim(<<<SQL
-				DELETE FROM "{$this->tblnam}" WHERE "_slug"=:slug;
+				DELETE FROM "{$this->tblnam}" WHERE "{$this->tblnam}"."_slug"=:slug;
 			SQL);
 
 			$fnResult = false;
@@ -984,7 +984,7 @@
 				$token = $this->get_unique_token();
 				$this->selectBindings[$token] = $node['value'];
 
-				$fnResult = $node['column'] . ' ' . $node['op'] . ' ' . $token;
+				$fnResult = '"' . $this->tblnam . '"."' . $node['column'] . '" ' . $node['op'] . ' ' . $token;
 			}
 
 			/** @var string */
@@ -1012,7 +1012,7 @@
 
 				if( !empty( $in ) ) {
 
-					$fnResult = $node['column'] . ' IN (' . implode( ', ', $in ) . ')';
+					$fnResult = '"' . $this->tblnam . '"."' . $node['column'] . '" IN (' . implode( ', ', $in ) . ')';
 				}
 			}
 
@@ -1036,7 +1036,7 @@
 				$max = $this->get_unique_token();
 				$this->selectBindings[$max] = $node['max'];
 
-				$fnResult = $node['column'] . ' BETWEEN ' . $min . ' AND ' . $max;
+				$fnResult = '"' . $this->tblnam . '"."' . $node['column'] . '" BETWEEN ' . $min . ' AND ' . $max;
 			}
 
 			/** @var string */
@@ -1053,7 +1053,7 @@
 
 			if( $node['op'] === 'IS NULL' ) {
 
-				$fnResult = $node['column'] . ' IS NULL';
+				$fnResult = '"' . $this->tblnam . '"."' . $node['column'] . '" IS NULL';
 			}
 
 			/** @var string */

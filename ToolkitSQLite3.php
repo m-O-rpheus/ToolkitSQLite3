@@ -809,8 +809,10 @@
 					self::validate_sqlite_name_guard_clause( $columnName );
 				}
 
-				$columnParts[] = $columnName;
-				$columnParts[] = 'typeof(' . $columnName . ') AS ' . static::TYPE_ALIAS . $columnName;
+				// Value and SQLite3 type of the column, both with the fully qualified name ("table"."column").
+				// typeof() returns null, integer, real, text or blob, select() derives the PHP type from it.
+				$columnParts[] = '"' . $this->tblnam . '"."' . $columnName . '" AS "' . $columnName . '"';
+				$columnParts[] = 'typeof("' . $this->tblnam . '"."' . $columnName . '") AS "' . static::TYPE_ALIAS . $columnName . '"';
 			}
 
 			/** @var string */

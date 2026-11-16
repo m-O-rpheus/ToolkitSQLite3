@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.5.2
+### Version 1.5.3
 
 ---
 
@@ -520,6 +520,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.5.3 Changelog:
+- `select()`: the column list uses fully qualified column names with an alias (`"table"."column" AS "column"` and `typeof( "table"."column" ) AS "_typeof_column"`). A column with the name of an SQLite keyword (e.g. `order`) can be selected, also with `select( [] )`, a missing column always throws ("no such column: table.column"). Otherwise the behavior is unchanged (same result columns, values and types). All column names in the SQL statements of `select()` are now quoted.
 
 #### Version 1.5.2 Changelog:
 - `select()`: ORDER BY uses fully qualified column names (`"table"."column"`). A column with the name of an SQLite keyword (e.g. `order`) can be used in ORDER BY, a missing column always throws ("no such column: table.column"). Otherwise the behavior is unchanged. The column list of `select()` does not quote the names yet.

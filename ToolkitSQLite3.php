@@ -454,10 +454,10 @@
 
 			self::validate_sqlite_name_guard_clause( $columnName );
 
-			$bindings = [':column' => $columnName];
+			$bindings = [':table' => $this->tblnam, ':column' => $columnName];
 
 			$sql = trim(<<<SQL
-				SELECT 1 FROM pragma_table_info("$this->tblnam") WHERE name=:column LIMIT 1;
+				SELECT 1 FROM pragma_table_info(:table) WHERE name=:column LIMIT 1;
 			SQL);
 
 			$fnResult = false;

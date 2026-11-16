@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.5.3
+### Version 1.5.4
 
 ---
 
@@ -520,6 +520,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.5.4 Changelog:
+- `column_exists()`: the table name is bound as a value (`pragma_table_info(:table)`) instead of being written in double quotes (`pragma_table_info("table")`), like in `table_exists()`. Before, the statement relied on SQLite3 reading a double-quoted name as a text value: it failed on an SQLite3 library without double-quoted string literals (`SQLITE_DQS=0`), and returned `false` for every column of a table named like a column of `pragma_table_info` (e.g. `name` or `type`, only possible with a class extension that changes `TABLE_PREFIX`). Otherwise the behavior is unchanged.
 
 #### Version 1.5.3 Changelog:
 - `select()`: the column list uses fully qualified column names with an alias (`"table"."column" AS "column"` and `typeof( "table"."column" ) AS "_typeof_column"`). A column with the name of an SQLite keyword (e.g. `order`) can be selected, also with `select( [] )`, a missing column always throws ("no such column: table.column"). Otherwise the behavior is unchanged (same result columns, values and types). All column names in the SQL statements of `select()` are now quoted.

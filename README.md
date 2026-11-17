@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.5.8
+### Version 1.5.9
 
 ---
 
@@ -78,7 +78,7 @@ if( $db->table_delete_ignore() ) {
 ```
 
 ## Column Handling
-Column names must start with a lowercase letter and may only contain lowercase letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (`MAX_LENGTH`, see above). In contrast to traditional database systems, no fixed data types are defined per column. Instead, typing is handled dynamically at the value level, following the SQLite3-style approach.
+Column names must start with a lowercase letter, may only contain lowercase letters, numbers or underscores and may be at most 512 characters long (`MAX_LENGTH`, see above). Unlike in traditional database systems, a column has no fixed data type: the type is stored per value (SQLite3 dynamic typing).
 
 ### Check if a column exists
 ```php
@@ -105,7 +105,7 @@ if( $db->columns_delete_ignore( 'title', 'views', 'status', 'payload', 'float' )
 ```
 
 ## Row Handling
-Each row is uniquely identified by its _slug value. This field is internally managed by the API and serves as a unique identifier for individual records. The _slug must not be empty, otherwise it is not restricted regarding characters or length (the same applies to the stored values). All inputs are internally handled using prepared statements to ensure proper and secure parameter binding.
+Each row is uniquely identified by its `_slug`, which is managed internally by the API. The `_slug` must not be empty, otherwise it is not restricted in characters or length (the same applies to the stored values). All inputs are bound with prepared statements.
 
 ### Check if a row exists
 ```php
@@ -123,20 +123,19 @@ Behavior
 - Updates the row if _slug already exists in the database.
 - _created_at is set only on initial insert.
 - _updated_at is set on both insert and update operations.
-- Both store the Unix timestamp in seconds (UTC) and are returned as `int` (e.g. `date( 'Y-m-d H:i:s', $row['_created_at'] )`). Compare them only with `int` values in WHERE (e.g. `time() - 86400`), any other type (e.g. a `float` or a numeric string such as `'1700000000'`) throws a `RuntimeException`.
+- Both store the Unix timestamp in seconds (UTC) and are returned as `int`, e.g. readable with `date( 'Y-m-d H:i:s', $row['_created_at'] )`. In WHERE, compare them only with `int` values (e.g. `time() - 86400`). Other types, such as a `float` or a numeric string (`'1700000000'`), throw a `RuntimeException`.
 
 The provided column-value pairs determine which columns are written. Column names must be strings and must already exist in the database schema (add them with `columns_add_ignore()`). A failing query throws a `RuntimeException`, so `row_upsert()` returns `true` or throws.
 The following PHP data types are supported and internally mapped to SQLite’s dynamic typing system:
 - `null` → `SQLITE3_NULL`
-- `string` → `SQLITE3_TEXT`
+- `string` → `SQLITE3_BLOB` (text or binary data, stored 1:1)
 - `int` → `SQLITE3_INTEGER`
 - `float` → `SQLITE3_FLOAT`
-- `resource` → `SQLITE3_BLOB`
-- `array` → `SQLITE3_BLOB` (encoded as JSON)
+- `array` → `SQLITE3_TEXT` (encoded as JSON, invalid UTF-8 in a string is replaced by U+FFFD)
 
-Other types (e.g. `bool` or objects) throw a `RuntimeException` ("Unsupported data type").
+Other types (e.g. `bool`, objects or stream resources) throw a `RuntimeException` ("Unsupported data type"). An array that cannot be encoded as JSON (e.g. with `INF` or `NAN`, or more than 512 levels) throws a `RuntimeException` ("(JSON error)").
 
-Both resource values and array values share the same SQLite storage class (BLOB). To disambiguate these two logically different data types, arrays are serialized into JSON before storage and are prefixed with a dedicated alias marker. This alias ensures that JSON-encoded payloads can be reliably distinguished from raw binary stream data when reading from the database.
+Strings and arrays use different SQLite storage classes (BLOB and TEXT), so `select()` returns every value with its PHP type.
 ```php
 $row = ['title' => 'Hello World 1', 'views' => 42, 'status' => 'active'];
 
@@ -172,24 +171,18 @@ else {
 }
 ```
 
-### Binary data (BLOB)
-Binary data is stored and read as a stream resource. Two static conversion helpers convert between strings and stream resources:
-- `string_to_resource( $data )`: converts a string into a stream resource for `row_upsert()`. Returns `false` if the value is not a string or the stream cannot be created.
-- `resource_to_string( $data )`: reads a stream resource (e.g. a BLOB value of `select()`) into a string. Returns `false` if the value is not a stream resource or the stream cannot be read.
+### Text and binary data (BLOB)
+A PHP `string` may contain text as well as binary data (e.g. an image, encrypted data or NUL bytes). Every string is stored 1:1 as BLOB and comes back byte for byte unchanged as `string`, no conversion is needed.
 
 ```php
-$blob = ToolkitSQLite3::string_to_resource( file_get_contents( 'image.avif' ) );
-
-if( $blob !== false ) {
-	$db->row_upsert( 'image_1', ['payload' => $blob] );
-}
+$db->row_upsert( 'image_1', ['payload' => file_get_contents( 'image.avif' )] );
 
 $rows = $db->select( [
 	'columns' => ['payload'],
 	'where'   => ['column' => '_slug', 'op' => '=', 'value' => 'image_1']
 ] );
 
-$data = ToolkitSQLite3::resource_to_string( $rows[0]['payload'] ); // The binary string, or false on failure.
+$data = $rows[0]['payload']; // The binary data, byte for byte unchanged.
 ```
 
 ## SELECT Queries
@@ -217,7 +210,7 @@ $result = $db->select( [] );
 // post_1, post_2, post_3, post_4 (all columns)
 ```
 
-`select()` returns an array of rows (an empty array if nothing matches). Each row is an associative array of column name => value. The value has the PHP type of its SQLite3 runtime type: `null`, `string`, `int`, `float`, `array` (JSON-encoded arrays) or a stream `resource` (other BLOBs, read it with `resource_to_string()`).
+`select()` returns an array of rows (an empty array if nothing matches). Each row is an associative array of column name => value. A value has the PHP type of its SQLite3 storage class: `null`, `int`, `float`, `string` (BLOB and the TEXT of `_slug`) or `array` (JSON TEXT of a user column).
 
 ### Selecting Specific Columns
 Use the columns argument to limit the selected columns.
@@ -269,7 +262,9 @@ $result = $db->select( [
 ```
 
 ### WHERE
-The where argument accepts a structured logical expression tree. A leaf that is no valid predicate throws a `RuntimeException`: an unknown operator, a binary predicate without `value` or with `'value' => null` (use `IS NULL`), an `IN` with an empty `values` list, or a `BETWEEN` whose `min` or `max` is missing or not scalar. Values compared with a reserved column (`value`, every entry of `values`, `min` and `max`) must have the type of the column: a `string` for `_slug` (bound as TEXT), an `int` for `_id`, `_created_at` and `_updated_at` (bound as INTEGER). Any other type (e.g. `_slug = 10`, `_id = '1'`, a `float` or `null` in an `IN` list) throws a `RuntimeException` ("Unsupported data type").
+The where argument accepts a structured logical expression tree. A leaf that is no valid predicate throws a `RuntimeException`: an unknown operator, a binary predicate without `value` or with `'value' => null` (use `IS NULL`), an `IN` with an empty `values` list, or a `BETWEEN` whose `min` or `max` is missing or not scalar.
+
+Values compared with a reserved column (`value`, every entry of `values`, `min` and `max`) must have the type of the column: a `string` for `_slug` (bound as TEXT), an `int` for `_id`, `_created_at` and `_updated_at` (bound as INTEGER). Any other type (e.g. `_slug = 10`, `_id = '1'`, a `float` or `null` in an `IN` list) throws a `RuntimeException` ("Unsupported data type").
 #### Binary predicate (=, !=, <, <=, >, >=, LIKE, GLOB)
 ```php
 $result = $db->select( [
@@ -439,9 +434,9 @@ $result = $db->select( [
 ## Concurrent Access
 Several processes (e.g. parallel requests) can use the same database file. Two protected constants control the behavior and can be changed via class extension (late static binding):
 - `BUSY_TIMEOUT` (default `10000`): milliseconds to wait for the lock of another process before an operation fails with "database is locked".
-- `JOURNAL_MODE` (default `'WAL'`): with Write-Ahead Logging, readers do not block writers and vice versa. SQLite3 creates the files `*-wal` and `*-shm` next to the database file, so the folder must be writable. WAL does not work on network file systems, use e.g. `'DELETE'` there. The journal mode is stored permanently in the database file, so the constructor writes it only if it differs from the current mode (changing it does not use the busy timeout).
+- `JOURNAL_MODE` (default `'WAL'`): with Write-Ahead Logging, readers do not block writers and vice versa. SQLite3 creates the files `*-wal` and `*-shm` next to the database file, so the folder must be writable. WAL does not work on network file systems, use e.g. `'DELETE'` there.
 
-The journal mode is stored permanently in the database file and can only be changed while no other connection has the file open. Change `JOURNAL_MODE` for a new database, otherwise the constructor throws "database is locked".
+The journal mode is stored permanently in the database file, so the constructor writes it only if it differs from the current mode (without the busy timeout). It can only be changed while no other connection has the file open: change `JOURNAL_MODE` for a new database, otherwise the constructor throws "database is locked".
 
 ```php
 class ToolkitSQLite3New extends ToolkitSQLite3 {
@@ -471,7 +466,9 @@ It validates:
 If invalid parameters are detected, execution stops immediately with a clear error message, preventing silent data loss or inconsistent schema states.
 
 ### SQL injection
-SQL injection through the API is not possible: all values from user input (stored values, row slugs and WHERE values) are bound with prepared statements and therefore never become part of the SQL statement. Table and column names are validated and quoted, so every SQLite keyword (e.g. `order`, `select`, `where` or `null`) can be used as a name. The only exceptions are the column names `rowid` and `oid`: as long as no such column exists, SQLite reads them as the internal row number (`_id`) instead of throwing an error.
+SQL injection through the API is not possible: all values from user input (stored values, row slugs and WHERE values) are bound with prepared statements and therefore never become part of the SQL statement.
+
+Table and column names are validated and quoted, so every SQLite keyword (e.g. `order`, `select`, `where` or `null`) can be used as a name. The only exceptions are the column names `rowid` and `oid`: as long as no such column exists, SQLite reads them as the internal row number (`_id`) instead of throwing an error.
 
 ## Notes
 - All errors throw a `RuntimeException`, also SQLite3 errors (e.g. a database that cannot be opened, a locked database or an invalid query). The original `SQLite3Exception` (or `Exception` if the database cannot be opened) is available via `getPrevious()`.
@@ -523,32 +520,45 @@ ToolkitSQLite3-main
 
 ---
 
+#### Version 1.5.9 Changelog:
+- Breaking change: a `string` is stored as BLOB (before: TEXT) and comes back unchanged, also with NUL bytes (before: cut at the first NUL byte). An `array` is stored as JSON TEXT without a marker (before: BLOB with the prefix `JSON_ALIAS`). `select()` returns a BLOB as `string` and the TEXT of a user column as `array`, the reserved columns are unchanged (`_slug` stays TEXT).
+- Breaking change: stream resources are no longer supported. `string_to_resource()`, `resource_to_string()` and the constant `JSON_ALIAS` were removed, binary data is stored as `string`.
+- Breaking change: create the tables of an older version again. A string that an older version stored as TEXT is read as JSON and throws a `RuntimeException` ("(JSON error)"), an array of an older version (BLOB with marker) comes back as `string`. BLOB values of stream resources stay readable and come back as `string`.
+- The message of SQLite3 errors is "ToolkitSQLite3: (SQLite3 error) The SQLite3 operation failed: …" (before: "ToolkitSQLite3: (SQLite3 error) …"), followed by the original message.
+- New error "ToolkitSQLite3: (JSON error) …": every error of the JSON conversion of an array (e.g. `INF` or `NAN`, too deep nesting, or a TEXT that is no JSON) throws a `RuntimeException` with this message, the `JsonException` is available via `getPrevious()`. Invalid UTF-8 in a string of an array is replaced by U+FFFD (before: "Unsupported data type").
+- Fixed: a stored stream resource whose content started with the JSON marker came back as `array`, a string with NUL bytes was cut.
+- README: the sections "Insert or update a row (UPSERT)", "Text and binary data (BLOB)" and "Basic Usage" of "SELECT Queries" describe the storage of strings (BLOB) and arrays (JSON TEXT).
+
 #### Version 1.5.8 Changelog:
 - README: the new subsection "SQL injection" of the section "Schema & SQL Safety" describes that SQL injection through the API is not possible and that every SQLite keyword can be used as a table or column name (except the column names `rowid` and `oid`).
 - The comment of the reserved columns in `select()` is on its own line. The behavior is unchanged.
 
 #### Version 1.5.7 Changelog:
-- Breaking change: `select()` compares the reserved columns only with values of their type (`value`, every entry of `values`, `min` and `max`): `_slug` with a `string`, `_id`, `_created_at` and `_updated_at` with an `int`. Before, both types were accepted for all four columns. E.g. `_slug = 10` or `_created_at < '1700000000'` now throw a `RuntimeException` ("Unsupported data type").
-- Internal placeholder names: `:table_name` and `:column_name` (before: `:reserved_table` and `:reserved_column`), `:row_string` for the row slug of `row_isset()`, `row_upsert()` and `row_remove()` (before: `:reserved_slug`), `:row_string1, …` for WHERE values of `_slug` and `:row_int1, …` for WHERE values of `_id`, `_created_at` and `_updated_at` (before: `:reserved_bind1, …`), `:row_any1, …` for the values of the user columns (before: `:any_bind1, …`). `select()` defines the binding prefix of every reserved column together with its name.
+- Breaking change: `select()` compares the reserved columns only with values of their type (`value`, every entry of `values`, `min` and `max`): `_slug` with a `string`, `_id`, `_created_at` and `_updated_at` with an `int` (before: both types for all four columns). E.g. `_slug = 10` or `_created_at < '1700000000'` now throw a `RuntimeException` ("Unsupported data type").
+- Internal placeholder names, `select()` defines the prefix of every reserved column together with its name:
+  - `:table_name` and `:column_name` (before: `:reserved_table` and `:reserved_column`)
+  - `:row_string` for the row slug of `row_isset()`, `row_upsert()` and `row_remove()` (before: `:reserved_slug`), `:row_string1, …` for WHERE values of `_slug`
+  - `:row_int1, …` for WHERE values of `_id`, `_created_at` and `_updated_at` (before, like `_slug`: `:reserved_bind1, …`)
+  - `:row_any1, …` for the values of the user columns (before: `:any_bind1, …`)
 - The message of the error "Unsupported data type" names the allowed type of the reserved columns (`_slug`: `string`, `_id`, `_created_at` and `_updated_at`: `int`).
 - README: the sections "WHERE", "Reserved Columns" and "Insert or update a row (UPSERT)" describe the type of the reserved columns in WHERE.
 
 #### Version 1.5.6 Changelog:
 - Breaking change: `select()` accepts only `string` and `int` as WHERE values for the reserved columns `_id`, `_slug`, `_created_at` and `_updated_at` (`value`, every entry of `values`, `min` and `max`), any other type throws a `RuntimeException` ("Unsupported data type"). Before, e.g. a `float` (`_created_at > 1.5`), `null` in an `IN` list or an `array` was accepted.
-- Table names, column names and values of the reserved columns skip the type mapping of the PHP data type: a `string` is bound as TEXT, an `int` as INTEGER. The internal placeholders are named by their binding: `:reserved_table`, `:reserved_column`, `:reserved_slug` and `:reserved_bind1, …` (WHERE on a reserved column), `:any_bind1, …` for the values of the user columns (type of the PHP value). Otherwise the behavior is unchanged.
+- Table names, column names and values of the reserved columns skip the type mapping of the PHP data type: a `string` is bound as TEXT, an `int` as INTEGER. Internal placeholders: `:reserved_table`, `:reserved_column`, `:reserved_slug` and `:reserved_bind1, …` (WHERE on a reserved column), `:any_bind1, …` for the user columns (type of the PHP value). Otherwise the behavior is unchanged.
 - The message of the error "Unsupported data type" names the allowed types of the reserved columns (`string`, `int`).
 - README: the sections "WHERE", "Reserved Columns" and "Insert or update a row (UPSERT)" describe that the reserved columns are compared only with `string` or `int` values.
 
 #### Version 1.5.5 Changelog:
 - Breaking change: the minimum requirement is SQLite 3.38 (before: 3.37), because of `unixepoch()`.
-- Breaking change: `_created_at` and `_updated_at` are INTEGER columns with the Unix timestamp in seconds (UTC) instead of TEXT (`YYYY-MM-DD HH:MM:SS`), `select()` returns them as `int`. The value is created with `unixepoch()` (default of both columns, and `_updated_at` in `row_upsert()`). Compare the timestamps with `int` values in WHERE, a text such as `'2026-11-17'` is greater than every number. An existing table keeps its TEXT columns (`CREATE TABLE IF NOT EXISTS`), create the tables of an older version again, otherwise text and Unix timestamps are mixed.
+- Breaking change: `_created_at` and `_updated_at` are INTEGER columns with the Unix timestamp in seconds (UTC) instead of TEXT (`YYYY-MM-DD HH:MM:SS`), created with `unixepoch()` (default of both columns, `_updated_at` also in `row_upsert()`). `select()` returns them as `int`. Compare them with `int` values, a text such as `'2026-11-17'` is greater than every number. An existing table keeps its TEXT columns (`CREATE TABLE IF NOT EXISTS`): create it again, otherwise text and Unix timestamps are mixed.
 - README: the section "Insert or update a row (UPSERT)" describes the Unix timestamps, the section "Reserved Columns" names the type of every built-in column, the section "Requirements" names SQLite 3.38.
 
 #### Version 1.5.4 Changelog:
-- `column_exists()`: the table name is bound as a value (`pragma_table_info(:table)`) instead of being written in double quotes (`pragma_table_info("table")`), like in `table_exists()`. Before, the statement relied on SQLite3 reading a double-quoted name as a text value: it failed on an SQLite3 library without double-quoted string literals (`SQLITE_DQS=0`), and returned `false` for every column of a table named like a column of `pragma_table_info` (e.g. `name` or `type`, only possible with a class extension that changes `TABLE_PREFIX`). Otherwise the behavior is unchanged.
+- `column_exists()` binds the table name as a value (`pragma_table_info(:table)`) instead of writing it in double quotes, like `table_exists()`. Before, it relied on SQLite3 reading a double-quoted name as text: it failed without double-quoted string literals (`SQLITE_DQS=0`) and returned `false` for every column of a table named like a column of `pragma_table_info` (e.g. `name`, only possible with a changed `TABLE_PREFIX`). Otherwise the behavior is unchanged.
 
 #### Version 1.5.3 Changelog:
-- `select()`: the column list uses fully qualified column names with an alias (`"table"."column" AS "column"` and `typeof( "table"."column" ) AS "_typeof_column"`). A column with the name of an SQLite keyword (e.g. `order`) can be selected, also with `select( [] )`, a missing column always throws ("no such column: table.column"). Otherwise the behavior is unchanged (same result columns, values and types). All column names in the SQL statements of `select()` are now quoted.
+- `select()`: the column list uses fully qualified column names with an alias (`"table"."column" AS "column"`, also for `typeof()`), all column names of `select()` are now quoted. A column named like an SQLite keyword (e.g. `order`) can be selected, also with `select( [] )`, and a missing column always throws ("no such column: table.column"). Otherwise the behavior is unchanged (same result columns, values and types).
 
 #### Version 1.5.2 Changelog:
 - `select()`: ORDER BY uses fully qualified column names (`"table"."column"`). A column with the name of an SQLite keyword (e.g. `order`) can be used in ORDER BY, a missing column always throws ("no such column: table.column"). Otherwise the behavior is unchanged. The column list of `select()` does not quote the names yet.
@@ -588,32 +598,38 @@ ToolkitSQLite3-main
 
 #### Version 1.4.0 Changelog:
 - Comments: the constructor and the destructor have a description, `resource_to_string()` and `string_to_resource()` describe their return value (`false` on failure), `consume_query()` and `select_buildWhere__renderLeafNode()` mention the `RuntimeException`.
-- README: the section "Row Handling" no longer says that the `_slug` has no restrictions (an empty slug throws). New: the table prefix (`TABLE_PREFIX`) and the constant `MAX_LENGTH`, the `RuntimeException` for unsupported data types in `row_upsert()` and for invalid WHERE predicates, `limit` and `offset` must be an `int`. The example "UPSERT using loops" writes three different rows. The performance note on `PRAGMA table_info` describes its current use. No functional changes.
+- README: "Row Handling" no longer says that the `_slug` has no restrictions (an empty slug throws). New: the table prefix (`TABLE_PREFIX`), `MAX_LENGTH`, the `RuntimeException` for unsupported data types in `row_upsert()` and for invalid WHERE predicates, `limit` and `offset` as `int`. "UPSERT using loops" writes three different rows, the performance note describes the current use of `PRAGMA table_info`. No functional changes.
 
 #### Version 1.3.9 Changelog:
 - README: new section "Binary data (BLOB)" describes the conversion helpers `string_to_resource()` and `resource_to_string()` with an example and their return value (`false` on failure). No functional changes.
 
 #### Version 1.3.8 Changelog:
-- Breaking change: the connection uses `SQLite3::enableExceptions( true )`. Every SQLite3 error throws a `RuntimeException` (message "ToolkitSQLite3: (SQLite3 error) …", the original exception via `getPrevious()`, new helper `throw_rethrow_sqlite_error()`) instead of a PHP warning and the return value `false`. Also a database that cannot be opened (`new SQLite3()` throws a plain `Exception`) throws a `RuntimeException`. `table_add_ignore()`, `table_delete_ignore()`, `columns_add_ignore()` and `columns_delete_ignore()` return `true` or throw (callers that checked `false` now receive the exception), `columns_add_ignore()` and `columns_delete_ignore()` on a missing table throw "no such table".
+- Breaking change: the connection uses `SQLite3::enableExceptions( true )`:
+  - Every SQLite3 error throws a `RuntimeException` ("ToolkitSQLite3: (SQLite3 error) …", original exception via `getPrevious()`, new helper `throw_rethrow_sqlite_error()`) instead of a PHP warning and `false`, also a database that cannot be opened.
+  - `table_add_ignore()`, `table_delete_ignore()`, `columns_add_ignore()` and `columns_delete_ignore()` return `true` or throw (callers that checked `false` now get the exception), the column methods throw "no such table" on a missing table.
 - `try`/`catch( SQLite3Exception )` in the constructor (`catch( Exception )`), `consume_query()`, `table_add_ignore()`, `table_delete_ignore()`, `columns_add_ignore()`, `columns_delete_ignore()` and `select_buildList()`.
-- Bugfix (race condition): `columns_add_ignore()` and `columns_delete_ignore()` run one `ALTER TABLE` per column without `column_exists()` before (the column names are validated directly), "duplicate column name" and "no such column" count as success. Before, two processes that added (or removed) the same column at the same time failed. Tested with 8 parallel processes and 40 columns: before 53 (add) and 102 (delete) of 320 operations failed, now none.
+- Bugfix (race condition): `columns_add_ignore()` and `columns_delete_ignore()` run one `ALTER TABLE` per column without `column_exists()` before (the names are validated directly), "duplicate column name" and "no such column" count as success. Before, two processes that added or removed the same column at the same time failed (test with 8 processes and 40 columns: 53 and 102 of 320 operations failed, now none).
 - README: new section "Error Handling", two notes, the examples of the four methods above no longer show an unreachable `else { echo 'Query error'; }`.
 
 #### Version 1.3.7 Changelog:
 - Code style: `consume_query()` sets `$err = false` after the callback instead of before it (the statement counts as successful after the callback has finished). No functional changes.
 
 #### Version 1.3.6 Changelog:
-- Comments and README: `row_upsert()` and `row_remove()` never return `false` on a failing query, `consume_query()` throws a `RuntimeException` ("false on query error" and "or the deletion failed" were wrong). The comments of all methods that use `consume_query()` (`table_exists()`, `column_exists()`, `row_isset()`, `row_upsert()`, `row_remove()`, `select()`) mention it. The examples of `row_upsert()` no longer show an unreachable `else { echo 'Query error'; }`. `row_upsert()` does not create columns ("created or updated" was wrong). The section "Concurrent Access" explains that the journal mode is written only if it differs. The section "SELECT Queries" describes the return value of `select()` (array of rows, PHP types of the values). The example of `row_remove()` shows the return value (`true` if a row was removed, `false` if no matching row existed). The comments "// Last check …" are removed from the examples. No functional changes.
+- Comments and README, no functional changes:
+  - `row_upsert()` and `row_remove()` never return `false` on a failing query, `consume_query()` throws a `RuntimeException` ("false on query error" and "or the deletion failed" were wrong). The comments of all methods that use `consume_query()` mention it.
+  - `row_upsert()` does not create columns ("created or updated" was wrong), its examples no longer show an unreachable `else { echo 'Query error'; }`.
+  - "Concurrent Access" explains that the journal mode is written only if it differs, "SELECT Queries" describes the return value of `select()` (array of rows, PHP types of the values).
+  - The example of `row_remove()` shows the return value (`true` if a row was removed, `false` if no matching row existed), the comments "// Last check …" are removed from the examples.
 
 #### Version 1.3.5 Changelog:
-- Breaking change: table and column names must start with a lowercase letter and contain only lowercase letters, digits or underscores (before: also uppercase letters), otherwise a `RuntimeException` is thrown. SQLite3 compares names case-insensitively, so `B` and `b` are the same column: e.g. `columns_delete_ignore( 'B' )` checked `column_exists( 'B' )` case-sensitively. Callers with uppercase names must use lowercase names, existing databases with uppercase table or column names must be created again.
+- Breaking change: table and column names must start with a lowercase letter and contain only lowercase letters, digits or underscores (before: also uppercase letters), otherwise a `RuntimeException` is thrown. SQLite3 compares names case-insensitively (`B` and `b` are the same column), but e.g. `column_exists( 'B' )` checked case-sensitively. Use lowercase names and create databases with uppercase table or column names again.
 
 #### Version 1.3.4 Changelog:
 - Code style: `select_buildList()` closes the result of `PRAGMA table_info` in a `finally` block, the same way as `consume_query()`. No functional changes.
 
 #### Version 1.3.3 Changelog:
 - Bugfix: the constructor writes the journal mode only if it differs from the current one (the mode, e.g. WAL, is stored permanently in the database file). Changing the journal mode does not use the busy timeout, in parallel operation it failed sporadically with "database is locked".
-- Bugfix: `consume_query()` executes the statement only if the SQL contains no placeholder without a value (`count( $comparison ) === $stmt->paramCount()`). Before, only the passed values were checked (`array_keys( $bindings ) === $comparison`), a placeholder in the SQL without a passed value was used as `NULL` silently and the row was stored with an empty value.
+- Bugfix: `consume_query()` executes the statement only if the SQL contains no placeholder without a value (`count( $comparison ) === $stmt->paramCount()`). Before, only the passed values were checked, a placeholder without a value was used as `NULL` silently and the row was stored with an empty value.
 
 #### Version 1.3.2 Changelog:
 - Code style: the section of the exception helpers (trait `ToolkitSQLite3_methods_errors`) has the uniform header "Centralized exception handling helpers.". No functional changes.

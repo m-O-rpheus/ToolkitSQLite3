@@ -34,12 +34,11 @@
 		// Protected constants used for configuration and default settings.
 		// -----------------------------------------------------------------------------------------------------------------------------
 
-		protected const TABLE_PREFIX = 'toolkitsqlite3_';               // Prefix used to identify the context and is prepended to table names.
-		protected const TYPE_ALIAS   = '_typeof_';                      // Prefix for SELECT alias columns used to temporarily store SQLite3 value types.
-		protected const JSON_ALIAS   = '@@<#~TOOLKITSQLITE3~JSON~#>@@'; // Prefix used to mark JSON blobs.
-		protected const MAX_LENGTH   = 512;                             // Maximum length for table and column names (excluding the prefix).
-		protected const BUSY_TIMEOUT = 10000;                           // Milliseconds to wait for a lock of another process before "database is locked" (0 = fail immediately).
-		protected const JOURNAL_MODE = 'WAL';                           // SQLite3 journal mode (WAL: readers and writers do not block each other, stored in the database file).
+		protected const TABLE_PREFIX = 'toolkitsqlite3_'; // Prefix used to identify the context and is prepended to table names.
+		protected const TYPE_ALIAS   = '_typeof_';        // Prefix for SELECT alias columns used to temporarily store SQLite3 value types.
+		protected const MAX_LENGTH   = 512;               // Maximum length for table and column names (excluding the prefix).
+		protected const BUSY_TIMEOUT = 10000;             // Milliseconds to wait for a lock of another process before "database is locked" (0 = fail immediately).
+		protected const JOURNAL_MODE = 'WAL';             // SQLite3 journal mode (WAL: readers and writers do not block each other, stored in the database file).
 
 
 
@@ -86,8 +85,8 @@
 
 
 
-		// Generates a unique SQL parameter token (e.g. :row_any1, :row_string2, :row_int3, ...). The counter keeps the binding names unique within the instance.
-		// The prefix names the binding: :row_string for values of _slug, :row_int for values of _id, _created_at and _updated_at, :row_any for values of the user columns (see consume_query()).
+		// Generates a unique SQL parameter token (e.g. :row_any1, :row_string2, :row_int3, ...), the counter keeps the names unique within the instance.
+		// The prefix decides how consume_query() binds the value.
 		private int $i = 0;
 
 		private function get_unique_token( string $prefix = ':row_any' ) : string {
@@ -100,11 +99,10 @@
 
 
 
-		// Executes a prepared SQLite3 statement. The method accepts an SQL string with named placeholders as well as an associative array of parameter names mapped to values.
-		// The placeholder name decides the binding: table names (:table_name), column names (:column_name) and values of _slug (:row_string) only accept a string (TEXT),
-		// values of _id, _created_at and _updated_at (:row_int) only an int (INTEGER).
-		// For the values of the user columns (:row_any) the SQLite3 storage class is derived from the PHP data type (null, string, float, int, array, resource), because the user columns have no fixed type (ANY).
-		// The callback is executed only if all bindings were successfully applied, otherwise (e.g. a placeholder without a value) a RuntimeException is thrown.
+		// Executes a prepared SQLite3 statement with named placeholders and an associative array of placeholder name => value.
+		// The placeholder name decides the binding of each value (see the three branches below). A string is bound as BLOB (byte-exact, also with NUL bytes)
+		// and an array as JSON TEXT, so select() can tell both apart by their storage class.
+		// The callback is executed only if all values were bound, otherwise (e.g. a placeholder without a value) a RuntimeException is thrown.
 		private function consume_query( string $sql, array $bindings, Closure $callback ) : void {
 
 			// Every SQLite3 error (preparing, binding, executing and reading the rows in the callback) is passed on as a RuntimeException.
@@ -122,10 +120,10 @@
 						if( is_string( $paramName ) ) {
 
 							// paramName:  string
-							// paramValue: mixed  (null, string, float, int, array, resource)
+							// paramValue: mixed  (null, string, float, int, array)
 							// paramType:  int    (SQLite3 type constant)
 
-							// Table names (:table_name), column names (:column_name) and values of _slug (:row_string) skip the type mapping, they are always a string bound as TEXT (any other PHP type throws).
+							// :table_name, :column_name and :row_string (values of _slug) skip the type mapping: always PHP string -> SQLite3 TEXT, other PHP types throw.
 							if( $paramName === ':table_name' || $paramName === ':column_name' || str_starts_with( $paramName, ':row_string' ) ) {
 
 								if( is_string( $paramValue ) ) {
@@ -135,7 +133,7 @@
 								else self::throw_unsupported_data_type();
 							}
 
-							// Values of _id, _created_at and _updated_at (:row_int) skip the type mapping, they are always an int bound as INTEGER (any other PHP type throws).
+							// :row_int (values of _id, _created_at and _updated_at) skips the type mapping: always PHP int -> SQLite3 INTEGER, other PHP types throw.
 							else if( str_starts_with( $paramName, ':row_int' ) ) {
 
 								if( is_int( $paramValue ) ) {
@@ -145,43 +143,33 @@
 								else self::throw_unsupported_data_type();
 							}
 
-							// Values of the user columns (:row_any): the SQLite3 type is derived from the PHP data type.
-							else {
+							// :row_any (values of the user columns) uses the type mapping PHP -> SQLite3, because the user columns have no fixed type (ANY). Other PHP types throw.
+							else if( str_starts_with( $paramName, ':row_any' ) ) {
 
-								if( is_null( $paramValue ) ) {
+								if( is_null( $paramValue ) ) {        // typemapping: PHP null -> SQLite3 NULL
 
 									$paramType = SQLITE3_NULL;
 								}
-								else if( is_string( $paramValue ) ) {
+								else if( is_string( $paramValue ) ) { // typemapping: PHP string -> SQLite3 BLOB
 
-									$paramType = SQLITE3_TEXT;
+									$paramType = SQLITE3_BLOB;
 								}
-								else if( is_float( $paramValue ) ) {
+								else if( is_float( $paramValue ) ) {  // typemapping: PHP float -> SQLite3 REAL
 
 									$paramType = SQLITE3_FLOAT;
 								}
-								else if( is_int( $paramValue ) ) {
+								else if( is_int( $paramValue ) ) {    // typemapping: PHP int -> SQLite3 INTEGER
 
 									$paramType = SQLITE3_INTEGER;
 								}
-								else if( is_array( $paramValue ) ) {
+								else if( is_array( $paramValue ) ) {  // typemapping: PHP array -> SQLite3 TEXT (JSON)
 
-									if( ( $paramValue = self::tagged_json_encode( $paramValue ) ) !== false ) {
-
-										$paramType = SQLITE3_BLOB;
-									}
-									else self::throw_unsupported_data_type();
-								}
-								else if( is_resource( $paramValue ) ) {
-
-									if( ( $paramValue = self::resource_to_string( $paramValue ) ) !== false ) {
-
-										$paramType = SQLITE3_BLOB;
-									}
-									else self::throw_unsupported_data_type();
+									$paramValue = self::jsonEncode( $paramValue );
+									$paramType  = SQLITE3_TEXT;
 								}
 								else self::throw_unsupported_data_type();
 							}
+							else self::throw_unsupported_data_type();
 
 							// Bind the value to its placeholder name.
 							if( ( $stmt->bindValue( $paramName, $paramValue, $paramType ) ) !== false ) {
@@ -191,7 +179,7 @@
 						}
 					}
 
-					// Execute the statement only if all passed values were bound successfully and the SQL contains no further placeholders (an unbound placeholder would be NULL silently).
+					// Execute only if all values were bound and the SQL has no placeholder without a value (it would be NULL silently).
 					if( array_keys( $bindings ) === $comparison && count( $comparison ) === $stmt->paramCount() ) {
 
 						if( ( $result = $stmt->execute() ) !== false ) {
@@ -251,89 +239,39 @@
 
 
 
-	// Conversion helpers between PHP strings, stream resources and tagged JSON blobs.
+	// Conversion helpers between PHP arrays and the JSON TEXT of the user columns (see consume_query() and select()).
+	// jsonEncode() replaces invalid UTF-8 in a string by U+FFFD, jsonDecode() always gets a JSON array of jsonEncode().
+	// Every JSON error (e.g. INF, NAN or too deep nesting) throws a RuntimeException (see throw_rethrow_json_error()).
 	// -----------------------------------------------------------------------------------------------------------------------------
 
 	trait ToolkitSQLite3_methods_convert {
 
 
-		// Convert helper, stream resource to string.
-		// Returns the string, or false if the value is not a stream resource or the stream cannot be read.
-		final public static function resource_to_string( mixed $data ) : mixed {
+		private static function jsonEncode( array $data ) : string {
 
-			$fnResult = false;
+			try {
 
-			if( is_resource( $data ) ) {
-
-				rewind( $data );
-
-				if( ( $data = stream_get_contents( $data ) ) !== false ) {
-
-					$fnResult = $data;
-				}
+				/** @var string */
+				return json_encode( $data, JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR );
 			}
+			catch( JsonException $e ) {
 
-			/** @var string|false */
-			return $fnResult;
+				self::throw_rethrow_json_error( $e );
+			}
 		}
 
 
+		private static function jsonDecode( string $data ) : array {
 
-		// Convert helper, string to stream resource.
-		// Returns the stream resource, or false if the value is not a string or the stream cannot be created.
-		final public static function string_to_resource( mixed $data ) : mixed {
+			try {
 
-			$fnResult = false;
-
-			if( is_string( $data ) ) {
-
-				if( ( $stream = fopen( 'php://temp', 'r+' ) ) !== false ) {
-
-					if( fwrite( $stream, $data ) !== false ) {
-
-						rewind( $stream );
-						$fnResult = $stream;
-					}
-				}
+				/** @var array */
+				return json_decode( $data, true, 512, JSON_THROW_ON_ERROR );
 			}
+			catch( JsonException $e ) {
 
-			/** @var resource|false */
-			return $fnResult;
-		}
-
-
-
-		// Convert helper, array to tagged JSON blob.
-		private static function tagged_json_encode( array $data ) : string|false {
-
-			$fnResult = false;
-
-			if( ( $data = json_encode( $data ) ) !== false ) {
-
-				$fnResult = static::JSON_ALIAS . $data;
+				self::throw_rethrow_json_error( $e );
 			}
-
-			/** @var string|false */
-			return $fnResult;
-		}
-
-
-
-		// Convert helper, tagged JSON blob to array.
-		private static function tagged_json_decode( string $data ) : array|false {
-
-			$fnResult = false;
-
-			if( str_starts_with( $data, static::JSON_ALIAS ) ) {
-
-				if( is_array( $data = json_decode( substr( $data, strlen( static::JSON_ALIAS ) ), true ) ) ) {
-
-					$fnResult = $data;
-				}
-			}
-
-			/** @var array|false */
-			return $fnResult;
 		}
 	}
 
@@ -367,7 +305,7 @@
 
 		private static function throw_unsupported_data_type() : never {
 
-			throw new RuntimeException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, array, resource (values of _slug: only string, values of _id, _created_at and _updated_at: only int).' );
+			throw new RuntimeException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, array (values of _slug: only string, values of _id, _created_at and _updated_at: only int).' );
 		}
 
 
@@ -379,7 +317,13 @@
 
 		private static function throw_rethrow_sqlite_error( Exception $e ) : never {
 
-			throw new RuntimeException( 'ToolkitSQLite3: (SQLite3 error) ' . $e->getMessage(), 0, $e );
+			throw new RuntimeException( 'ToolkitSQLite3: (SQLite3 error) The SQLite3 operation failed: ' . $e->getMessage(), 0, $e );
+		}
+
+
+		private static function throw_rethrow_json_error( JsonException $e ) : never {
+
+			throw new RuntimeException( 'ToolkitSQLite3: (JSON error) The conversion between array and JSON TEXT failed: ' . $e->getMessage(), 0, $e );
 		}
 	}
 
@@ -730,35 +674,37 @@
 
 					foreach( $record as $columnName => $attribute ) {
 
-						if( $attribute['type'] === 'null' ) {
+						// _slug skips the type mapping: always SQLite3 TEXT -> PHP string (the only TEXT column with a plain string, no JSON).
+						if( $columnName === '_slug' ) {
 
-							$record[$columnName] = null; // Null
+							$record[$columnName] = strval( $attribute['value'] );
 						}
-						else if( $attribute['type'] === 'text' ) {
 
-							$record[$columnName] = strval( $attribute['value'] ); // String
-						}
-						else if( $attribute['type'] === 'real' ) {
+						// All other columns (user columns, _id, _created_at, _updated_at) use the type mapping SQLite3 -> PHP by the storage class of typeof(), other storage classes throw.
+						else {
 
-							$record[$columnName] = floatval( $attribute['value'] ); // Float
-						}
-						else if( $attribute['type'] === 'integer' ) {
+							if( $attribute['type'] === 'null' ) {         // typemapping: SQLite3 NULL -> PHP null
 
-							$record[$columnName] = intval( $attribute['value'] ); // Integer
-						}
-						else if( $attribute['type'] === 'blob' ) {
-
-							if( ( $val = self::tagged_json_decode( $attribute['value'] ) ) !== false ) {
-
-								$record[$columnName] = $val; // Array
+								$record[$columnName] = null;
 							}
-							else if( ( $val = self::string_to_resource( $attribute['value'] ) ) !== false ) {
+							else if( $attribute['type'] === 'blob' ) {    // typemapping: SQLite3 BLOB -> PHP string
 
-								$record[$columnName] = $val; // Resource
+								$record[$columnName] = strval( $attribute['value'] );
+							}
+							else if( $attribute['type'] === 'real' ) {    // typemapping: SQLite3 REAL -> PHP float
+
+								$record[$columnName] = floatval( $attribute['value'] );
+							}
+							else if( $attribute['type'] === 'integer' ) { // typemapping: SQLite3 INTEGER -> PHP int
+
+								$record[$columnName] = intval( $attribute['value'] );
+							}
+							else if( $attribute['type'] === 'text' ) {    // typemapping: SQLite3 TEXT -> PHP array (JSON of a user column)
+
+								$record[$columnName] = self::jsonDecode( strval( $attribute['value'] ) );
 							}
 							else self::throw_unsupported_data_type();
 						}
-						else self::throw_unsupported_data_type();
 					}
 
 					$fnResult[] = $record;
@@ -877,7 +823,7 @@
 
 
 		// Helper to build the LIMIT clause for the SELECT statement.
-		// Restricts the maximum number of rows returned by the query. Without a valid limit, 'LIMIT -1' (no limit) is used, because SQLite3 only accepts OFFSET after LIMIT.
+		// Restricts the number of returned rows. Without a valid limit 'LIMIT -1' (no limit) is used, because SQLite3 accepts OFFSET only after LIMIT.
 		// Example usage: $db->select( ['limit' => 10] )
 		private function select_buildLimit( array $args ) : string {
 
@@ -907,10 +853,8 @@
 	trait ToolkitSQLite3_methods_select__where {
 
 
-		// Helper to build the WHERE clause for the SELECT statement.
-		// Entry point for building the WHERE clause from a structured condition tree.
-		// The expression tree is evaluated by a Logical Tree Node Renderer (for logical structure such as AND/OR/NOT) and a Leaf Node Renderer (for atomic comparisons such as column operators and value checks).
-		// Due to this hierarchical complexity, the evaluation logic is separated into dedicated helper methods.
+		// Helper to build the WHERE clause for the SELECT statement from a structured condition tree.
+		// The tree is evaluated by the Logical Tree Node Renderer (AND, OR, NOT) and the Leaf Node Renderer (single comparisons), each in its own helper method.
 		// Example usage: $db->select( ['where' => [...]] )
 		private function select_buildWhere( array $args ) : string {
 
@@ -961,10 +905,9 @@
 
 
 		// Helper for the WHERE clause Builder - Leaf Node Renderer.
-		// Processes atomic WHERE expressions representing a single column-based condition.
-		// Each leaf node defines a basic predicate consisting of a column identifier, an operator, and the associated operand(s).
-		// Throws a RuntimeException if the node is no valid predicate (e.g. an unknown operator, a missing or null value, or an empty IN list).
-		// Values compared with a reserved column get the binding prefix of $this->selectReserved (:row_string or :row_int), values of a user column get :row_any (see consume_query()).
+		// Renders a single condition: a column, an operator and its operand(s).
+		// An invalid node (e.g. an unknown operator, a missing or null value, or an empty IN list) throws a RuntimeException.
+		// The values get the binding prefix of their column from $this->selectReserved, otherwise :row_any (see consume_query()).
 		private function select_buildWhere__renderLeafNode( array $node ) : string {
 
 			$fnResult = '';

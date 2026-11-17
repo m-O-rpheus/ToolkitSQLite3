@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.5.5
+### Version 1.5.6
 
 ---
 
@@ -123,7 +123,7 @@ Behavior
 - Updates the row if _slug already exists in the database.
 - _created_at is set only on initial insert.
 - _updated_at is set on both insert and update operations.
-- Both store the Unix timestamp in seconds (UTC) and are returned as `int` (e.g. `date( 'Y-m-d H:i:s', $row['_created_at'] )`). Compare them with `int` values in WHERE (e.g. `time() - 86400`).
+- Both store the Unix timestamp in seconds (UTC) and are returned as `int` (e.g. `date( 'Y-m-d H:i:s', $row['_created_at'] )`). Compare them with `int` values in WHERE (e.g. `time() - 86400`), a `float` throws a `RuntimeException`.
 
 The provided column-value pairs determine which columns are written. Column names must be strings and must already exist in the database schema (add them with `columns_add_ignore()`). A failing query throws a `RuntimeException`, so `row_upsert()` returns `true` or throws.
 The following PHP data types are supported and internally mapped to SQLite’s dynamic typing system:
@@ -269,7 +269,7 @@ $result = $db->select( [
 ```
 
 ### WHERE
-The where argument accepts a structured logical expression tree. A leaf that is no valid predicate throws a `RuntimeException`: an unknown operator, a binary predicate without `value` or with `'value' => null` (use `IS NULL`), an `IN` with an empty `values` list, or a `BETWEEN` whose `min` or `max` is missing or not scalar.
+The where argument accepts a structured logical expression tree. A leaf that is no valid predicate throws a `RuntimeException`: an unknown operator, a binary predicate without `value` or with `'value' => null` (use `IS NULL`), an `IN` with an empty `values` list, or a `BETWEEN` whose `min` or `max` is missing or not scalar. Values compared with a reserved column (`_id`, `_slug`, `_created_at`, `_updated_at`; `value`, every entry of `values`, `min` and `max`) must be a `string` (bound as TEXT) or an `int` (bound as INTEGER), any other type (e.g. `float` or `null` in an `IN` list) throws a `RuntimeException` ("Unsupported data type").
 #### Binary predicate (=, !=, <, <=, >, >=, LIKE, GLOB)
 ```php
 $result = $db->select( [
@@ -454,7 +454,7 @@ $db = new ToolkitSQLite3New( 'database.sqlite3', 'example_table' );
 ```
 
 ## Reserved Columns
-The following columns are internally reserved and automatically allowed without validation:
+The following columns are internally reserved and automatically allowed without validation. In WHERE they are compared only with `string` or `int` values:
 - _id (`int`, unique row number)
 - _slug (`string`, unique identifier of the row)
 - _created_at (`int`, Unix timestamp of the insert)
@@ -521,6 +521,12 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.5.6 Changelog:
+- Breaking change: `select()` accepts only `string` and `int` as WHERE values for the reserved columns `_id`, `_slug`, `_created_at` and `_updated_at` (`value`, every entry of `values`, `min` and `max`), any other type throws a `RuntimeException` ("Unsupported data type"). Before, e.g. a `float` (`_created_at > 1.5`), `null` in an `IN` list or an `array` was accepted.
+- Table names, column names and values of the reserved columns skip the type mapping of the PHP data type: a `string` is bound as TEXT, an `int` as INTEGER. The internal placeholders are named by their binding: `:reserved_table`, `:reserved_column`, `:reserved_slug` and `:reserved_bind1, …` (WHERE on a reserved column), `:any_bind1, …` for the values of the user columns (type of the PHP value). Otherwise the behavior is unchanged.
+- The message of the error "Unsupported data type" names the allowed types of the reserved columns (`string`, `int`).
+- README: the sections "WHERE", "Reserved Columns" and "Insert or update a row (UPSERT)" describe that the reserved columns are compared only with `string` or `int` values.
 
 #### Version 1.5.5 Changelog:
 - Breaking change: the minimum requirement is SQLite 3.38 (before: 3.37), because of `unixepoch()`.

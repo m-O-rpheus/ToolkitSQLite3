@@ -86,23 +86,24 @@
 
 
 
-		// Generates a unique SQL parameter token (e.g. :any_bind1, :reserved_bind2, ...). The counter keeps the binding names unique within the instance.
-		// Prefix :reserved_ for values of the reserved columns (_id, _slug, _created_at, _updated_at), :any_ for values of the user columns. Table names, column names and the slug of the row methods use the fixed placeholders :reserved_table, :reserved_column and :reserved_slug.
+		// Generates a unique SQL parameter token (e.g. :row_any1, :row_string2, :row_int3, ...). The counter keeps the binding names unique within the instance.
+		// The prefix names the binding: :row_string for values of _slug, :row_int for values of _id, _created_at and _updated_at, :row_any for values of the user columns (see consume_query()).
 		private int $i = 0;
 
-		private function get_unique_token( string $prefix = ':any_' ) : string {
+		private function get_unique_token( string $prefix = ':row_any' ) : string {
 
 			$this->i++;
 
 			/** @var string */
-			return $prefix . 'bind' . $this->i;
+			return $prefix . $this->i;
 		}
 
 
 
 		// Executes a prepared SQLite3 statement. The method accepts an SQL string with named placeholders as well as an associative array of parameter names mapped to values.
-		// Placeholders with the prefix :reserved_ (table names, column names and values of the reserved columns) only accept a string (TEXT) or an int (INTEGER).
-		// For all other placeholders (:any_) the SQLite3 storage class is derived from the PHP data type (null, string, float, int, array, resource), because the user columns have no fixed type (ANY).
+		// The placeholder name decides the binding: table names (:table_name), column names (:column_name) and values of _slug (:row_string) only accept a string (TEXT),
+		// values of _id, _created_at and _updated_at (:row_int) only an int (INTEGER).
+		// For the values of the user columns (:row_any) the SQLite3 storage class is derived from the PHP data type (null, string, float, int, array, resource), because the user columns have no fixed type (ANY).
 		// The callback is executed only if all bindings were successfully applied, otherwise (e.g. a placeholder without a value) a RuntimeException is thrown.
 		private function consume_query( string $sql, array $bindings, Closure $callback ) : void {
 
@@ -124,21 +125,27 @@
 							// paramValue: mixed  (null, string, float, int, array, resource)
 							// paramType:  int    (SQLite3 type constant)
 
-							// Table names, column names and values of the reserved columns skip the type mapping: a string is bound as TEXT, an int as INTEGER, any other PHP type throws.
-							if( str_starts_with( $paramName, ':reserved_' ) ) {
+							// Table names (:table_name), column names (:column_name) and values of _slug (:row_string) skip the type mapping, they are always a string bound as TEXT (any other PHP type throws).
+							if( $paramName === ':table_name' || $paramName === ':column_name' || str_starts_with( $paramName, ':row_string' ) ) {
 
 								if( is_string( $paramValue ) ) {
 
 									$paramType = SQLITE3_TEXT;
 								}
-								else if( is_int( $paramValue ) ) {
+								else self::throw_unsupported_data_type();
+							}
+
+							// Values of _id, _created_at and _updated_at (:row_int) skip the type mapping, they are always an int bound as INTEGER (any other PHP type throws).
+							else if( str_starts_with( $paramName, ':row_int' ) ) {
+
+								if( is_int( $paramValue ) ) {
 
 									$paramType = SQLITE3_INTEGER;
 								}
 								else self::throw_unsupported_data_type();
 							}
 
-							// All other placeholders: the SQLite3 type is derived from the PHP data type.
+							// Values of the user columns (:row_any): the SQLite3 type is derived from the PHP data type.
 							else {
 
 								if( is_null( $paramValue ) ) {
@@ -360,7 +367,7 @@
 
 		private static function throw_unsupported_data_type() : never {
 
-			throw new RuntimeException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, array, resource (values of the reserved columns _id, _slug, _created_at and _updated_at: only string, int).' );
+			throw new RuntimeException( 'ToolkitSQLite3: Unsupported data type. Allowed PHP <> SQLite3 runtime types are: null, string, float, int, array, resource (values of _slug: only string, values of _id, _created_at and _updated_at: only int).' );
 		}
 
 
@@ -390,10 +397,10 @@
 		// Returns true if the table exists, otherwise false. A failing query throws a RuntimeException.
 		public function table_exists() : bool {
 
-			$bindings = [':reserved_table' => $this->tblnam];
+			$bindings = [':table_name' => $this->tblnam];
 
 			$sql = trim(<<<SQL
-				SELECT 1 FROM sqlite_master WHERE type='table' AND name=:reserved_table LIMIT 1;
+				SELECT 1 FROM sqlite_master WHERE type='table' AND name=:table_name LIMIT 1;
 			SQL);
 
 			$fnResult = false;
@@ -476,10 +483,10 @@
 
 			self::validate_sqlite_name_guard_clause( $columnName );
 
-			$bindings = [':reserved_table' => $this->tblnam, ':reserved_column' => $columnName];
+			$bindings = [':table_name' => $this->tblnam, ':column_name' => $columnName];
 
 			$sql = trim(<<<SQL
-				SELECT 1 FROM pragma_table_info(:reserved_table) WHERE name=:reserved_column LIMIT 1;
+				SELECT 1 FROM pragma_table_info(:table_name) WHERE name=:column_name LIMIT 1;
 			SQL);
 
 			$fnResult = false;
@@ -576,10 +583,10 @@
 
 			self::validate_row_slug_guard_clause( $rowSlug );
 
-			$bindings = [':reserved_slug' => $rowSlug];
+			$bindings = [':row_string' => $rowSlug];
 
 			$sql = trim(<<<SQL
-				SELECT 1 FROM "{$this->tblnam}" WHERE "{$this->tblnam}"."_slug"=:reserved_slug LIMIT 1;
+				SELECT 1 FROM "{$this->tblnam}" WHERE "{$this->tblnam}"."_slug"=:row_string LIMIT 1;
 			SQL);
 
 			$fnResult = false;
@@ -604,9 +611,9 @@
 			self::validate_row_slug_guard_clause( $rowSlug );
 
 			$columns  = ['"_slug"'];
-			$params   = [':reserved_slug'];
+			$params   = [':row_string'];
 			$clauses  = ['"_updated_at"=unixepoch()'];
-			$bindings = [':reserved_slug' => $rowSlug];
+			$bindings = [':row_string' => $rowSlug];
 
 			foreach( $columnNameValuePair as $columnName => $columnValue ) {
 
@@ -647,10 +654,10 @@
 
 			self::validate_row_slug_guard_clause( $rowSlug );
 
-			$bindings = [':reserved_slug' => $rowSlug];
+			$bindings = [':row_string' => $rowSlug];
 
 			$sql = trim(<<<SQL
-				DELETE FROM "{$this->tblnam}" WHERE "{$this->tblnam}"."_slug"=:reserved_slug;
+				DELETE FROM "{$this->tblnam}" WHERE "{$this->tblnam}"."_slug"=:row_string;
 			SQL);
 
 			$fnResult = false;
@@ -683,7 +690,7 @@
 
 		public function select( array $args ) : array {
 
-			$this->selectReserved = ['_id', '_slug', '_created_at', '_updated_at']; // Reserved column names, excluded from validation (their WHERE values get the prefix :reserved_).
+			$this->selectReserved = ['_id' => ':row_int', '_slug' => ':row_string', '_created_at' => ':row_int', '_updated_at' => ':row_int']; // Reserved column names (excluded from validation) mapped to the binding prefix of their WHERE values (see consume_query()).
 			$this->selectBindings = [];
 
 			$buildDistinct = $this->select_buildDistinct( $args );
@@ -827,7 +834,7 @@
 
 			foreach( $columnNames as $columnName ) {
 
-				if( !in_array( $columnName, $this->selectReserved, true ) ) {
+				if( !in_array( $columnName, array_keys( $this->selectReserved ), true ) ) {
 
 					self::validate_sqlite_name_guard_clause( $columnName );
 				}
@@ -854,7 +861,7 @@
 
 			foreach( $sortRules as $columnName => $direction ) {
 
-				if( !in_array( $columnName, $this->selectReserved, true ) ) {
+				if( !in_array( $columnName, array_keys( $this->selectReserved ), true ) ) {
 
 					self::validate_sqlite_name_guard_clause( $columnName );
 				}
@@ -956,7 +963,7 @@
 		// Processes atomic WHERE expressions representing a single column-based condition.
 		// Each leaf node defines a basic predicate consisting of a column identifier, an operator, and the associated operand(s).
 		// Throws a RuntimeException if the node is no valid predicate (e.g. an unknown operator, a missing or null value, or an empty IN list).
-		// Values compared with a reserved column get the prefix :reserved_ and must be a string or an int, values of a user column get :any_ (see consume_query()).
+		// Values compared with a reserved column get the binding prefix of $this->selectReserved (:row_string or :row_int), values of a user column get :row_any (see consume_query()).
 		private function select_buildWhere__renderLeafNode( array $node ) : string {
 
 			$fnResult = '';
@@ -964,7 +971,7 @@
 			// Structural validation: all leaf nodes require a column identifier and an operator.
 			if( isset( $node['column'], $node['op'] ) && is_string( $node['column'] ) && is_string( $node['op'] ) ) {
 
-				if( !in_array( $node['column'], $this->selectReserved, true ) ) {
+				if( !in_array( $node['column'], array_keys( $this->selectReserved ), true ) ) {
 
 					self::validate_sqlite_name_guard_clause( $node['column'] );
 				}
@@ -1007,7 +1014,7 @@
 
 			if( in_array( $node['op'], ['=', '!=', '<', '<=', '>', '>=', 'LIKE', 'GLOB'], true ) && isset( $node['value'] ) ) {
 
-				$token = $this->get_unique_token( in_array( $node['column'], $this->selectReserved, true ) ? ':reserved_' : ':any_' );
+				$token = $this->get_unique_token( $this->selectReserved[$node['column']] ?? ':row_any' );
 				$this->selectBindings[$token] = $node['value'];
 
 				$fnResult = '"' . $this->tblnam . '"."' . $node['column'] . '" ' . $node['op'] . ' ' . $token;
@@ -1031,7 +1038,7 @@
 
 				foreach( $node['values'] as $value ) {
 
-					$token = $this->get_unique_token( in_array( $node['column'], $this->selectReserved, true ) ? ':reserved_' : ':any_' );
+					$token = $this->get_unique_token( $this->selectReserved[$node['column']] ?? ':row_any' );
 					$this->selectBindings[$token] = $value;
 					$in[] = $token;
 				}
@@ -1056,10 +1063,10 @@
 
 			if( $node['op'] === 'BETWEEN' && isset( $node['min'], $node['max'] ) && is_scalar( $node['min'] ) && is_scalar( $node['max'] ) ) {
 
-				$min = $this->get_unique_token( in_array( $node['column'], $this->selectReserved, true ) ? ':reserved_' : ':any_' );
+				$min = $this->get_unique_token( $this->selectReserved[$node['column']] ?? ':row_any' );
 				$this->selectBindings[$min] = $node['min'];
 
-				$max = $this->get_unique_token( in_array( $node['column'], $this->selectReserved, true ) ? ':reserved_' : ':any_' );
+				$max = $this->get_unique_token( $this->selectReserved[$node['column']] ?? ':row_any' );
 				$this->selectBindings[$max] = $node['max'];
 
 				$fnResult = '"' . $this->tblnam . '"."' . $node['column'] . '" BETWEEN ' . $min . ' AND ' . $max;

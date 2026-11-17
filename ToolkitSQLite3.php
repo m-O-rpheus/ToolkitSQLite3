@@ -101,7 +101,7 @@
 
 
 		// Executes a prepared SQLite3 statement. The method accepts an SQL string with named placeholders as well as an associative array of parameter names mapped to values.
-		// Since columns are not strictly typed (using flexible storage types), the actual SQLite3 affinity is derived from the PHP data type.
+		// The user columns have no fixed type (ANY), so the SQLite3 storage class of a bound value is derived from its PHP data type.
 		// The following PHP data types are possible: null, string, float, int, array, resource.
 		// The callback is executed only if all bindings were successfully applied, otherwise (e.g. a placeholder without a value) a RuntimeException is thrown.
 		private function consume_query( string $sql, array $bindings, Closure $callback ) : void {
@@ -389,6 +389,7 @@
 
 
 		// Creates the table if it does not exist.
+		// _created_at and _updated_at store the Unix timestamp as INTEGER (seconds, UTC, unixepoch() requires SQLite3 3.38).
 		// Returns true, the table exists afterwards. Every SQLite3 error throws a RuntimeException.
 		public function table_add_ignore() : bool {
 
@@ -396,8 +397,8 @@
 				CREATE TABLE IF NOT EXISTS "{$this->tblnam}" (
 					"_id" INTEGER PRIMARY KEY AUTOINCREMENT,
 					"_slug" TEXT NOT NULL UNIQUE,
-					"_created_at" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					"_updated_at" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+					"_created_at" INTEGER NOT NULL DEFAULT (unixepoch()),
+					"_updated_at" INTEGER NOT NULL DEFAULT (unixepoch())
 				) STRICT;
 			SQL);
 
@@ -575,6 +576,7 @@
 
 		// Inserts a new row or updates an existing row based on the slug value.
 		// All values are safely bound using prepared statements and column names are validated at runtime.
+		// _updated_at (and _created_at on insert, default of the table) is set to the current Unix timestamp by SQLite3 itself, it is no bound value.
 		// Returns true if the query executed successfully (insert or update). A failing query throws a RuntimeException.
 		public function row_upsert( string $rowSlug, array $columnNameValuePair ) : bool {
 
@@ -582,7 +584,7 @@
 
 			$columns  = ['"_slug"'];
 			$params   = [':slug'];
-			$clauses  = ['"_updated_at"=CURRENT_TIMESTAMP'];
+			$clauses  = ['"_updated_at"=unixepoch()'];
 			$bindings = [':slug' => $rowSlug];
 
 			foreach( $columnNameValuePair as $columnName => $columnValue ) {

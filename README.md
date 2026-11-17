@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.5.4
+### Version 1.5.5
 
 ---
 
@@ -123,6 +123,7 @@ Behavior
 - Updates the row if _slug already exists in the database.
 - _created_at is set only on initial insert.
 - _updated_at is set on both insert and update operations.
+- Both store the Unix timestamp in seconds (UTC) and are returned as `int` (e.g. `date( 'Y-m-d H:i:s', $row['_created_at'] )`). Compare them with `int` values in WHERE (e.g. `time() - 86400`).
 
 The provided column-value pairs determine which columns are written. Column names must be strings and must already exist in the database schema (add them with `columns_add_ignore()`). A failing query throws a `RuntimeException`, so `row_upsert()` returns `true` or throws.
 The following PHP data types are supported and internally mapped to SQLite’s dynamic typing system:
@@ -454,10 +455,10 @@ $db = new ToolkitSQLite3New( 'database.sqlite3', 'example_table' );
 
 ## Reserved Columns
 The following columns are internally reserved and automatically allowed without validation:
-- _id
-- _slug
-- _created_at
-- _updated_at
+- _id (`int`, unique row number)
+- _slug (`string`, unique identifier of the row)
+- _created_at (`int`, Unix timestamp of the insert)
+- _updated_at (`int`, Unix timestamp of the last insert or update)
 
 ## Schema & SQL Safety
 This toolkit enforces strict validation and protection mechanisms to ensure safe database operations.
@@ -498,7 +499,7 @@ This toolkit is designed to be predictable, readable, and boring — in the best
 
 ## Requirements
 - **PHP:** 8.3 or higher
-- **PHP extensions:** `sqlite3` with SQLite 3.37 or higher
+- **PHP extensions:** `sqlite3` with SQLite 3.38 or higher
 
 ---
 
@@ -520,6 +521,11 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.5.5 Changelog:
+- Breaking change: the minimum requirement is SQLite 3.38 (before: 3.37), because of `unixepoch()`.
+- Breaking change: `_created_at` and `_updated_at` are INTEGER columns with the Unix timestamp in seconds (UTC) instead of TEXT (`YYYY-MM-DD HH:MM:SS`), `select()` returns them as `int`. The value is created with `unixepoch()` (default of both columns, and `_updated_at` in `row_upsert()`). Compare the timestamps with `int` values in WHERE, a text such as `'2026-11-17'` is greater than every number. An existing table keeps its TEXT columns (`CREATE TABLE IF NOT EXISTS`), create the tables of an older version again, otherwise text and Unix timestamps are mixed.
+- README: the section "Insert or update a row (UPSERT)" describes the Unix timestamps, the section "Reserved Columns" names the type of every built-in column, the section "Requirements" names SQLite 3.38.
 
 #### Version 1.5.4 Changelog:
 - `column_exists()`: the table name is bound as a value (`pragma_table_info(:table)`) instead of being written in double quotes (`pragma_table_info("table")`), like in `table_exists()`. Before, the statement relied on SQLite3 reading a double-quoted name as a text value: it failed on an SQLite3 library without double-quoted string literals (`SQLITE_DQS=0`), and returned `false` for every column of a table named like a column of `pragma_table_info` (e.g. `name` or `type`, only possible with a class extension that changes `TABLE_PREFIX`). Otherwise the behavior is unchanged.

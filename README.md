@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.5.7
+### Version 1.5.8
 
 ---
 
@@ -468,9 +468,10 @@ It validates:
 - column names
 - row identifiers
 
-All runtime values are bound using prepared statements. Table and column identifiers are strictly validated, and no user input is ever concatenated directly into SQL statements.
-
 If invalid parameters are detected, execution stops immediately with a clear error message, preventing silent data loss or inconsistent schema states.
+
+### SQL injection
+SQL injection through the API is not possible: all values from user input (stored values, row slugs and WHERE values) are bound with prepared statements and therefore never become part of the SQL statement. Table and column names are validated and quoted, so every SQLite keyword (e.g. `order`, `select`, `where` or `null`) can be used as a name. The only exceptions are the column names `rowid` and `oid`: as long as no such column exists, SQLite reads them as the internal row number (`_id`) instead of throwing an error.
 
 ## Notes
 - All errors throw a `RuntimeException`, also SQLite3 errors (e.g. a database that cannot be opened, a locked database or an invalid query). The original `SQLite3Exception` (or `Exception` if the database cannot be opened) is available via `getPrevious()`.
@@ -521,6 +522,10 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.5.8 Changelog:
+- README: the new subsection "SQL injection" of the section "Schema & SQL Safety" describes that SQL injection through the API is not possible and that every SQLite keyword can be used as a table or column name (except the column names `rowid` and `oid`).
+- The comment of the reserved columns in `select()` is on its own line. The behavior is unchanged.
 
 #### Version 1.5.7 Changelog:
 - Breaking change: `select()` compares the reserved columns only with values of their type (`value`, every entry of `values`, `min` and `max`): `_slug` with a `string`, `_id`, `_created_at` and `_updated_at` with an `int`. Before, both types were accepted for all four columns. E.g. `_slug = 10` or `_created_at < '1700000000'` now throw a `RuntimeException` ("Unsupported data type").

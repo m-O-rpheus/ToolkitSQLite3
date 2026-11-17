@@ -690,7 +690,8 @@
 
 		public function select( array $args ) : array {
 
-			$this->selectReserved = ['_id' => ':row_int', '_slug' => ':row_string', '_created_at' => ':row_int', '_updated_at' => ':row_int']; // Reserved column names (excluded from validation) mapped to the binding prefix of their WHERE values (see consume_query()).
+			// Reserved column names (excluded from validation) mapped to the binding prefix of their WHERE values (see consume_query()).
+			$this->selectReserved = ['_id' => ':row_int', '_slug' => ':row_string', '_created_at' => ':row_int', '_updated_at' => ':row_int'];
 			$this->selectBindings = [];
 
 			$buildDistinct = $this->select_buildDistinct( $args );

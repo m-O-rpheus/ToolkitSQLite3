@@ -1,6 +1,6 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.5.9
+### Version 1.6.0
 
 ---
 
@@ -455,6 +455,8 @@ The following columns are internally reserved and automatically allowed without 
 - _created_at (`int`, Unix timestamp of the insert)
 - _updated_at (`int`, Unix timestamp of the last insert or update)
 
+`select()` reads the SQLite3 storage class of every column under an alias that starts with the protected constant `TYPE_ALIAS` (default `'_typeof_'`). A column name always starts with a lowercase letter, so it never starts with the default. A class extension must keep a value that no valid column name can start with (e.g. one that starts with `_`), otherwise `select()` mixes up values and types.
+
 ## Schema & SQL Safety
 This toolkit enforces strict validation and protection mechanisms to ensure safe database operations.
 
@@ -519,6 +521,9 @@ ToolkitSQLite3-main
 ```
 
 ---
+
+#### Version 1.6.0 Changelog:
+- README: the section "Reserved Columns" describes the protected constant `TYPE_ALIAS` and which values a class extension may use. No functional changes.
 
 #### Version 1.5.9 Changelog:
 - Breaking change: a `string` is stored as BLOB (before: TEXT) and comes back unchanged, also with NUL bytes (before: cut at the first NUL byte). An `array` is stored as JSON TEXT without a marker (before: BLOB with the prefix `JSON_ALIAS`). `select()` returns a BLOB as `string` and the TEXT of a user column as `array`, the reserved columns are unchanged (`_slug` stays TEXT).

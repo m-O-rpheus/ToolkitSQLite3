@@ -1,11 +1,13 @@
 # ToolkitSQLite3
 ## by Markus Jäger
-### Version 1.6.0
+### Version 1.6.1
 
 ---
 
 ToolkitSQLite3 is a lightweight PHP helper class and abstraction layer over SQLite3.
 It provides a clean, predictable, and safe API for common database operations, including schema management and data manipulation.
+
+---
 
 ## Features
 - Tables: existence checks, creation, and deletion.
@@ -17,11 +19,15 @@ It provides a clean, predictable, and safe API for common database operations, i
 - Focus on a simple API, high performance, and protection against SQL injection.
 - SELECT queries with common predicates.
 
+---
+
 ## Installation
 Include the class file:
 ```php
 require 'ToolkitSQLite3.php';
 ```
+
+---
 
 ## Basic Usage
 Table names must start with a lowercase letter and may only contain lowercase letters, numbers, or underscores. Additionally, they may be a maximum of 512 characters long (protected constant `MAX_LENGTH`, can be changed via class extension, late static binding).
@@ -31,6 +37,8 @@ The constructor opens the database file (it is created if it does not exist). Th
 ```php
 $db = new ToolkitSQLite3( 'database.sqlite3', 'example_table' );
 ```
+
+---
 
 ## Error Handling
 All errors throw a `RuntimeException`: invalid names or values, and every SQLite3 error (e.g. a database that cannot be opened, a missing table or a locked database). Methods that add, update or delete therefore return `true` or throw, they never return `false` on an error.
@@ -52,7 +60,10 @@ ToolkitSQLite3::validate_sqlite_name_guard_clause( 'title' );
 ToolkitSQLite3::validate_row_slug_guard_clause( 'first-entry' );
 ```
 
+---
+
 ## Table Handling
+
 ### Check if a table exists
 ```php
 if( $db->table_exists() ) {
@@ -76,6 +87,8 @@ if( $db->table_delete_ignore() ) {
 	echo 'Query was executed successfully';
 }
 ```
+
+---
 
 ## Column Handling
 Column names must start with a lowercase letter, may only contain lowercase letters, numbers or underscores and may be at most 512 characters long (`MAX_LENGTH`, see above). Unlike in traditional database systems, a column has no fixed data type: the type is stored per value (SQLite3 dynamic typing).
@@ -103,6 +116,8 @@ if( $db->columns_delete_ignore( 'title', 'views', 'status', 'payload', 'float' )
 	echo 'Query was executed successfully';
 }
 ```
+
+---
 
 ## Row Handling
 Each row is uniquely identified by its `_slug`, which is managed internally by the API. The `_slug` must not be empty, otherwise it is not restricted in characters or length (the same applies to the stored values). All inputs are bound with prepared statements.
@@ -185,6 +200,8 @@ $rows = $db->select( [
 $data = $rows[0]['payload']; // The binary data, byte for byte unchanged.
 ```
 
+---
+
 ## SELECT Queries
 The select() method provides a structured and safe abstraction layer for building SQLite3 SELECT queries.
 
@@ -265,6 +282,7 @@ $result = $db->select( [
 The where argument accepts a structured logical expression tree. A leaf that is no valid predicate throws a `RuntimeException`: an unknown operator, a binary predicate without `value` or with `'value' => null` (use `IS NULL`), an `IN` with an empty `values` list, or a `BETWEEN` whose `min` or `max` is missing or not scalar.
 
 Values compared with a reserved column (`value`, every entry of `values`, `min` and `max`) must have the type of the column: a `string` for `_slug` (bound as TEXT), an `int` for `_id`, `_created_at` and `_updated_at` (bound as INTEGER). Any other type (e.g. `_slug = 10`, `_id = '1'`, a `float` or `null` in an `IN` list) throws a `RuntimeException` ("Unsupported data type").
+
 #### Binary predicate (=, !=, <, <=, >, >=, LIKE, GLOB)
 ```php
 $result = $db->select( [
@@ -400,6 +418,8 @@ $result = $db->select( [
 // post_4
 ```
 
+---
+
 ## Combining Multiple Query Components
 ```php
 $result = $db->select( [
@@ -431,6 +451,8 @@ $result = $db->select( [
 // 2 rows: Hello World 1 with 120 views, Hello World 1 with 42 views
 ```
 
+---
+
 ## Concurrent Access
 Several processes (e.g. parallel requests) can use the same database file. Two protected constants control the behavior and can be changed via class extension (late static binding):
 - `BUSY_TIMEOUT` (default `10000`): milliseconds to wait for the lock of another process before an operation fails with "database is locked".
@@ -448,6 +470,8 @@ class ToolkitSQLite3New extends ToolkitSQLite3 {
 $db = new ToolkitSQLite3New( 'database.sqlite3', 'example_table' );
 ```
 
+---
+
 ## Reserved Columns
 The following columns are internally reserved and automatically allowed without validation. In WHERE they are compared only with a value of the named type:
 - _id (`int`, unique row number)
@@ -456,6 +480,8 @@ The following columns are internally reserved and automatically allowed without 
 - _updated_at (`int`, Unix timestamp of the last insert or update)
 
 `select()` reads the SQLite3 storage class of every column under an alias that starts with the protected constant `TYPE_ALIAS` (default `'_typeof_'`). A column name always starts with a lowercase letter, so it never starts with the default. A class extension must keep a value that no valid column name can start with (e.g. one that starts with `_`), otherwise `select()` mixes up values and types.
+
+---
 
 ## Schema & SQL Safety
 This toolkit enforces strict validation and protection mechanisms to ensure safe database operations.
@@ -472,6 +498,8 @@ SQL injection through the API is not possible: all values from user input (store
 
 Table and column names are validated and quoted, so every SQLite keyword (e.g. `order`, `select`, `where` or `null`) can be used as a name. The only exceptions are the column names `rowid` and `oid`: as long as no such column exists, SQLite reads them as the internal row number (`_id`) instead of throwing an error.
 
+---
+
 ## Notes
 - All errors throw a `RuntimeException`, also SQLite3 errors (e.g. a database that cannot be opened, a locked database or an invalid query). The original `SQLite3Exception` (or `Exception` if the database cannot be opened) is available via `getPrevious()`.
 - `columns_add_ignore()` and `columns_delete_ignore()` are safe for concurrent processes: a column that another process added or removed at the same time counts as success.
@@ -481,11 +509,15 @@ Table and column names are validated and quoted, so every SQLite keyword (e.g. `
 - Nested logical expressions are fully recursive.
 - LIMIT and OFFSET values are clamped to a minimum of `0`.
 
+---
+
 ## Performance Notes
 - `PRAGMA table_info` is used to determine the columns (`select()` without `columns`, `column_exists()`).
 - SQLite3 internally caches schema information.
 - For typical workloads, this is not a performance bottleneck.
 - No additional caching layer is introduced.
+
+---
 
 ## Design Philosophy
 - No ORM
@@ -522,6 +554,10 @@ ToolkitSQLite3-main
 
 ---
 
+#### Version 1.6.1 Changelog:
+- Revised the complete changelog again: checked against the code changes of the commits, completed the entries 0.9, 0.92, 0.93, 0.94, 0.95, 0.97, 1.2, 1.4.7 and 1.5.8, added "No functional changes." to the purely formal versions 0.93, 0.94, 0.95, 1.2, 1.2.1, 1.4.7 and 1.5.8. No functional changes.
+- README: a `---` separates every content section, uniform spacing (a blank line after a code block). No functional changes.
+
 #### Version 1.6.0 Changelog:
 - README: the section "Reserved Columns" describes the protected constant `TYPE_ALIAS` and which values a class extension may use. No functional changes.
 
@@ -535,8 +571,8 @@ ToolkitSQLite3-main
 - README: the sections "Insert or update a row (UPSERT)", "Text and binary data (BLOB)" and "Basic Usage" of "SELECT Queries" describe the storage of strings (BLOB) and arrays (JSON TEXT).
 
 #### Version 1.5.8 Changelog:
-- README: the new subsection "SQL injection" of the section "Schema & SQL Safety" describes that SQL injection through the API is not possible and that every SQLite keyword can be used as a table or column name (except the column names `rowid` and `oid`).
-- The comment of the reserved columns in `select()` is on its own line. The behavior is unchanged.
+- README: the new subsection "SQL injection" of the section "Schema & SQL Safety" describes that SQL injection through the API is not possible and that every SQLite keyword can be used as a table or column name (except the column names `rowid` and `oid`). No functional changes.
+- The comment of the reserved columns in `select()` is on its own line. No functional changes.
 
 #### Version 1.5.7 Changelog:
 - Breaking change: `select()` compares the reserved columns only with values of their type (`value`, every entry of `values`, `min` and `max`): `_slug` with a `string`, `_id`, `_created_at` and `_updated_at` with an `int` (before: both types for all four columns). E.g. `_slug = 10` or `_created_at < '1700000000'` now throw a `RuntimeException` ("Unsupported data type").
@@ -581,7 +617,7 @@ ToolkitSQLite3-main
 - The `final` methods `validate_sqlite_name_guard_clause()` and `validate_row_slug_guard_clause()` are called with `self::` instead of `static::` (11 calls), as all members that cannot be overridden. No functional changes.
 
 #### Version 1.4.7 Changelog:
-- The built-in columns `_id`, `_slug`, `_created_at` and `_updated_at` are quoted in the SQL statements of the table and row methods. The behavior is unchanged.
+- The built-in columns `_id`, `_slug`, `_created_at` and `_updated_at` are quoted in the SQL statements of the table and row methods. No functional changes.
 
 #### Version 1.4.6 Changelog:
 - `validate_sqlite_name_guard_clause()` and `validate_row_slug_guard_clause()` are public, so that names and row slugs can be checked in advance. Both methods are final, so that the protection against SQL injection cannot be weakened via class extension.
@@ -673,10 +709,10 @@ ToolkitSQLite3-main
 - Breaking change: All errors throw a `RuntimeException` instead of an `InvalidArgumentException`.
 
 #### Version 1.2.1 Changelog:
-- Added and improved code comments for better readability and maintainability.
+- Added and improved code comments for better readability and maintainability. No functional changes.
 
 #### Version 1.2 Changelog:
-- Updated README.md.
+- README: the heading of the binary predicate lists its operators (=, !=, <, <=, >, >=, LIKE, GLOB). No functional changes.
 
 #### Version 1.1 Changelog:
 - Added support for storing PHP arrays via JSON encoding in BLOB columns.
@@ -707,26 +743,30 @@ ToolkitSQLite3-main
 - The connection is closed in `__destruct()`.
 
 #### Version 0.97 Changelog:
-- Code Quality: new method `select()`, all queries run through the private helper `consume_query()`.
+- Code Quality: new method `select()`, all queries run through the private helper `consume_query()`. The default of `_created_at` and `_updated_at` is `CURRENT_TIMESTAMP` (same value as before).
+- README: the column types of `table_column_add_ignore()` (INTEGER, REAL, BLOB, TEXT) and headings that name the ignored cases.
 
 #### Version 0.96 Changelog:
 - Code Quality: `_created_at` and `_updated_at` have the default value of the current time.
 
 #### Version 0.95 Changelog:
-- Updated README.md and text indentation in ToolkitSQLite3.php.
+- README: added the dependency tree (low-level framework without dependencies). Indentation in ToolkitSQLite3.php. No functional changes.
 
 #### Version 0.94 Changelog:
 - Added LICENSE file and license info in source code.
+- README: the section "Attribution / License Notice" replaces "License", headings without a trailing colon. No functional changes.
 
 #### Version 0.93 Changelog:
-- Update: README.md extended with examples for all methods.
+- Update: README.md translated to English and extended with examples for all methods. No functional changes.
 
 #### Version 0.92 Changelog:
-- Update: new error for columns that do not exist in the table.
+- Update: new error for columns that do not exist in the table (`row_upsert()`). `table_column_add_ignore()` returns `false` if not all columns could be created (before: an error).
 
 #### Version 0.91 Changelog:
 - Update: the error methods were renamed (`error_if_*()`), new errors for an empty row slug and an invalid column type.
 - Breaking change: removed the public methods `sanitize_sqlite_name()` and `sanitize_sqlite_type()`, invalid names and types trigger an error instead of being cleaned.
 
 #### Version 0.9 Changelog:
-- Init.
+- Init: `new ToolkitSQLite3( $fileName, $tableName )` with `table_info_columns()`, `table_exists()`, `table_add_ignore()`, `table_delete_ignore()`, `column_exists()`, `column_add_ignore()`, `column_delete_ignore()`, `table_column_add_ignore()`, `row_isset()`, `row_upsert()` and `row_remove()`. Every row is identified by `_slug` and has `_created_at` and `_updated_at`, names and column types are cleaned with `sanitize_sqlite_name()` and `sanitize_sqlite_type()`, errors use `trigger_error()`.
+- README: German description with the feature list.
+- Added `.gitignore` and `.gitkeep`.
